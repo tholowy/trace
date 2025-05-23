@@ -145,7 +145,7 @@
     --info-foreground: 40 10% 90%; /* Corrected to a light color for dark theme */
 
     --warning: 40 70% 60%;
-    --warning-foreground: 210 5% 15%;
+    --warning-foreground: 40 10% 90%; /* Changed to a light color for better contrast */
 
     --border-light: 220 10% 25%;
     /* Un gris ligeramente más claro en dark mode */
@@ -238,6 +238,7 @@ button {
   .yoo-toolbar-root,
   .yoo-action-menu-list-content,
   .yoo-link-tool,
+  .yoopta-action-menu-list,
   .yoo-image-flex {
     @apply bg-card border border-border shadow-md rounded-lg;
 

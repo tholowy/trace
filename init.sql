@@ -66,18 +66,14 @@ CREATE TABLE project_members (
 CREATE TABLE pages (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  parent_page_id UUID REFERENCES pages(id) ON DELETE CASCADE, -- Para jerarquía infinita
+  parent_page_id UUID REFERENCES pages(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   slug TEXT NOT NULL,
-  content JSONB, -- Contenido Yoopta (puede ser null si es solo contenedor)
+  content JSONB,
   description TEXT,
   icon TEXT, -- Emoji o icono
   is_published BOOLEAN DEFAULT false,
-  order_index INTEGER NOT NULL DEFAULT 0,
-  page_type TEXT NOT NULL DEFAULT 'mixed' CHECK (page_type IN ('container', 'content', 'mixed')),
-  -- 'container': Solo tiene sub-páginas
-  -- 'content': Solo tiene contenido
-  -- 'mixed': Tiene contenido Y sub-páginas
+  order_index INTEGER NOT NULL DEFAULT 0, -- Para ordenar al mismo nivel
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id),
@@ -513,9 +509,8 @@ RETURNS TABLE (
   parent_page_id UUID,
   level INTEGER,
   path TEXT,
-  has_content BOOLEAN,
-  page_type TEXT,
-  order_index INTEGER
+  order_index INTEGER,
+  has_subpage_blocks BOOLEAN -- Si tiene bloques de subpáginas en el contenido
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -528,9 +523,8 @@ BEGIN
       p.parent_page_id,
       0 as level,
       p.slug::TEXT as path,
-      (p.content IS NOT NULL) as has_content,
-      p.page_type,
-      p.order_index
+      p.order_index,
+      (p.content::text LIKE '%"type": "sub-page"%') as has_subpage_blocks
     FROM pages p
     WHERE p.project_id = project_id_param 
     AND p.parent_page_id IS NULL
@@ -545,9 +539,8 @@ BEGIN
       p.parent_page_id,
       pt.level + 1,
       pt.path || '/' || p.slug,
-      (p.content IS NOT NULL) as has_content,
-      p.page_type,
-      p.order_index
+      p.order_index,
+      (p.content::text LIKE '%"type": "sub-page"%') as has_subpage_blocks
     FROM pages p
     JOIN page_tree pt ON p.parent_page_id = pt.id
     WHERE p.project_id = project_id_param
@@ -556,6 +549,33 @@ BEGIN
   ORDER BY level, order_index, title;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función para extraer referencias a subpáginas del contenido Yoopta
+CREATE OR REPLACE FUNCTION extract_subpage_references(content_jsonb JSONB)
+RETURNS TABLE (
+  referenced_page_id UUID,
+  display_mode TEXT,
+  order_in_content INTEGER
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    (block_data->>'page_id')::UUID as referenced_page_id,
+    COALESCE(block_data->>'display_mode', 'link') as display_mode,
+    COALESCE((block_data->>'order')::INTEGER, 0) as order_in_content
+  FROM (
+    SELECT jsonb_array_elements(
+      jsonb_path_query_array(
+        content_jsonb, 
+        '$.blocks[*] ? (@.type == "sub-page")'
+      )
+    )->>'data' as block_data_text
+  ) blocks_text,
+  LATERAL jsonb_extract_path_text(blocks_text::jsonb, 'data') block_data_json,
+  LATERAL block_data_json::jsonb block_data
+  WHERE (block_data->>'page_id') IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =============== HABILITAR ROW LEVEL SECURITY ===============
 
@@ -1114,7 +1134,6 @@ BEGIN
     content,
     description,
     icon,
-    page_type,
     created_by
   ) VALUES (
     source_page.project_id,
@@ -1124,7 +1143,6 @@ BEGIN
     source_page.content,
     source_page.description,
     source_page.icon,
-    source_page.page_type,
     auth.uid()
   ) RETURNING id INTO new_page_id;
   
@@ -1265,7 +1283,6 @@ BEGIN
         slug,
         description,
         icon,
-        page_type,
         order_index,
         is_published,
         created_by,
@@ -1304,7 +1321,6 @@ BEGIN
         slug,
         content,
         description,
-        page_type,
         is_published,
         created_by,
         updated_by,

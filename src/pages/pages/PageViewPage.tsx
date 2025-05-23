@@ -13,7 +13,8 @@ import {
   MoreHorizontal,
   Copy,
   Move,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -195,20 +196,23 @@ const PageViewPage: FC = () => {
       {/* Header de la página */}
       <div className="flex flex-col mb-6">
         <div className="flex items-center justify-between mb-4">
-          {/* Metadata */}
+          {/* Metadata - SIN TIPO DE PÁGINA */}
           <div className="flex items-center text-sm text-muted-foreground space-x-4">
             <div className="flex items-center">
               <Calendar size={16} className="mr-1" />
               <span>Actualizado el {formattedDate}</span>
             </div>
             <div className="flex items-center">
-              <Clock size={16} className="mr-1" />
-              <span>Tipo: {page.page_type}</span>
-            </div>
-            <div className="flex items-center">
               <Pencil size={16} className="mr-1" />
               <span>Por {editorName}</span>
             </div>
+            {/* Información adicional sobre subpáginas */}
+            {page.has_subpage_blocks && (
+              <div className="flex items-center">
+                <FileText size={16} className="mr-1" />
+                <span>Contiene subpáginas</span>
+              </div>
+            )}
           </div>
 
           {/* Acciones */}
@@ -233,8 +237,8 @@ const PageViewPage: FC = () => {
               onClick={togglePublished}
               className={`${
                 page.is_published
-                  ? 'bg-destructive/10 text-destructive hover:bg-destructive/20' // Color para despublicar (advertencia)
-                  : 'bg-success/10 text-success hover:bg-success/20' // Color para publicar (éxito)
+                  ? 'bg-destructive/10 text-destructive hover:bg-destructive/20'
+                  : 'bg-success/10 text-success hover:bg-success/20'
               } px-3 py-1.5 rounded-md text-sm font-medium flex items-center transition-colors duration-200`}
               disabled={publishing}
             >
@@ -264,7 +268,7 @@ const PageViewPage: FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowActionsMenu(!showActionsMenu)}
-                className="btn-ghost p-2" // Usamos btn-ghost para un botón de solo icono sin fondo
+                className="btn-ghost p-2"
               >
                 <MoreHorizontal size={16} />
               </button>
@@ -328,7 +332,7 @@ const PageViewPage: FC = () => {
               </p>
             )}
 
-            {/* Indicadores de estado */}
+            {/* Indicadores de estado - SIN TIPO DE PÁGINA */}
             <div className="flex items-center space-x-2">
               {!page.is_published && (
                 <span className="px-2 py-1 bg-warning/10 text-warning-foreground text-xs rounded-full">
@@ -336,11 +340,18 @@ const PageViewPage: FC = () => {
                 </span>
               )}
 
-              <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full">
-                {page.page_type === 'content' && 'Solo contenido'}
-                {page.page_type === 'container' && 'Solo contenedor'}
-                {page.page_type === 'mixed' && 'Contenido y subpáginas'}
+              {/* Nuevo indicador para sistema simplificado */}
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 text-xs rounded-full flex items-center">
+                <FileText size={12} className="mr-1" />
+                Página
               </span>
+
+              {/* Indicador si tiene subpáginas */}
+              {page.has_subpage_blocks && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 text-xs rounded-full">
+                  Con subpáginas
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -353,10 +364,8 @@ const PageViewPage: FC = () => {
         </div>
       )}
 
-      {/* Páginas hijas si es contenedor o mixta */}
-      {(page.page_type === 'container' || page.page_type === 'mixed') && (
-        <ChildPagesSection projectId={projectId!} parentPageId={pageId!} />
-      )}
+      {/* Mostrar páginas hijas SIEMPRE (ya no depende del tipo) */}
+      <ChildPagesSection projectId={projectId!} parentPageId={pageId!} />
 
       {/* Navegación entre páginas hermanas */}
       {navigationContext && (navigationContext.previous_page || navigationContext.next_page) && (
@@ -390,11 +399,12 @@ const PageViewPage: FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
 
-// Componente para mostrar páginas hijas
+// Componente para mostrar páginas hijas - SIMPLIFICADO
 interface ChildPagesSectionProps {
   projectId: string;
   parentPageId: string;
@@ -436,8 +446,12 @@ const ChildPagesSection: React.FC<ChildPagesSectionProps> = ({ projectId, parent
   return (
     <div className="bg-card rounded-lg shadow-sm p-6 mt-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">
-        Subpáginas
+        Subpáginas Jerárquicas
       </h2>
+      
+      <p className="text-sm text-muted-foreground mb-4">
+        Estas son las páginas que tienen esta página como padre en la jerarquía.
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {childPages.map(page => (
@@ -462,15 +476,24 @@ const ChildPagesSection: React.FC<ChildPagesSectionProps> = ({ projectId, parent
                 )}
 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {page.page_type}
+                  <span className="text-xs text-muted-foreground flex items-center">
+                    <FileText size={12} className="mr-1" />
+                    Página
                   </span>
 
-                  {!page.is_published && (
-                    <span className="text-xs px-2 py-0.5 bg-warning/10 text-warning-foreground rounded">
-                      Borrador
-                    </span>
-                  )}
+                  <div className="flex items-center space-x-1">
+                    {!page.is_published && (
+                      <span className="text-xs px-2 py-0.5 bg-warning/10 text-warning-foreground rounded">
+                        Borrador
+                      </span>
+                    )}
+                    
+                    {page.has_subpage_blocks && (
+                      <span className="text-xs px-2 py-0.5 bg-green/10 text-green-foreground rounded">
+                        Con subpáginas
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

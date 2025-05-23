@@ -36,6 +36,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { Document } from '../../types';
 import { Save, Clock, Check } from 'lucide-react';
+import SubPagePlugin from './plugins/SubPagePlugin';
 
 // Configuración de Mermaid
 mermaid.initialize({
@@ -53,11 +54,11 @@ interface DocumentEditorProps {
   readOnly?: boolean;
 }
 
-const DocumentEditor: FC<DocumentEditorProps> = ({ 
-  documentId, 
-  projectId, 
+const DocumentEditor: FC<DocumentEditorProps> = ({
+  documentId,
+  projectId,
   categoryId,
-  initialContent, 
+  initialContent,
   onSave,
   readOnly = false
 }) => {
@@ -72,7 +73,7 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
   const [versionMessage, setVersionMessage] = useState<string>('');
   const [showVersionDialog, setShowVersionDialog] = useState<boolean>(false);
   const [editorReady, setEditorReady] = useState<boolean>(false);
-  
+
   // Definir los plugins a utilizar con useMemo para evitar re-renderizados
   const plugins = useMemo(() => [
     Paragraph,
@@ -94,8 +95,9 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
     MermaidPlugin,
     Table,
     Image,
+    SubPagePlugin // Plugin simplificado sin callbacks adicionales
   ], []);
-  
+
   // Crear el editor con los plugins
   const editor = useMemo(() => {
     try {
@@ -108,37 +110,37 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
       return null;
     }
   }, []);
-  
+
   // Autoguardado
   useEffect(() => {
     if (readOnly || !documentId || !content || !editor || !editorReady) return;
-    
+
     const timer = setTimeout(() => {
       handleAutoSave();
-    }, 30000); // Autoguardar cada 30 segundos
-    
+    }, 5000); // Autoguardar cada 5 segundos
+
     return () => clearTimeout(timer);
   }, [content, documentId, readOnly, editor, editorReady]);
-  
+
   // Función para autoguardar
   const handleAutoSave = async () => {
     try {
       if (!documentId || saving || !user) return;
-      
+
       setSaving(true);
-      
+
       // Actualizar documento
       const { error } = await supabase
         .from('documents')
-        .update({ 
+        .update({
           content,
           updated_at: new Date().toISOString(),
           updated_by: user.id
         })
         .eq('id', documentId);
-      
+
       if (error) throw error;
-      
+
       setLastSaved(new Date());
     } catch (err: any) {
       console.error('Error al autoguardar:', err);
@@ -147,15 +149,15 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
       setSaving(false);
     }
   };
-  
+
   // Función para guardar versión
   const handleSaveVersion = async () => {
     try {
       if (!documentId || saving || !user) return;
-      
+
       setSaving(true);
       setError(null);
-      
+
       // 1. Obtener la última versión
       const { data: versionsData, error: versionsError } = await supabase
         .from('document_versions')
@@ -163,19 +165,19 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
         .eq('document_id', documentId)
         .order('created_at', { ascending: false })
         .limit(1);
-      
+
       if (versionsError) throw versionsError;
-      
+
       // 2. Determinar nuevo número de versión
       let versionNumber = '1.0.0';
-      
+
       if (versionsData && versionsData.length > 0) {
         const latestVersion = versionsData[0].version_number;
         const parts = latestVersion.split('.');
         const minor = parseInt(parts[1]) + 1;
         versionNumber = `${parts[0]}.${minor}.0`;
       }
-      
+
       // 3. Guardar nueva versión
       const { error: saveVersionError } = await supabase
         .from('document_versions')
@@ -187,26 +189,26 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
           created_by: user.id,
           is_published: false
         });
-      
+
       if (saveVersionError) throw saveVersionError;
-      
+
       // 4. Actualizar documento con la última versión
       const { error: updateDocError } = await supabase
         .from('documents')
-        .update({ 
+        .update({
           content,
           version: versionNumber,
           updated_at: new Date().toISOString(),
           updated_by: user.id
         })
         .eq('id', documentId);
-      
+
       if (updateDocError) throw updateDocError;
-      
+
       setLastSaved(new Date());
       setVersionMessage('');
       setShowVersionDialog(false);
-      
+
       // Callback opcional para el padre
       if (onSave) {
         onSave();
@@ -218,20 +220,20 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
       setSaving(false);
     }
   };
-  
+
   // Función para guardar un nuevo documento
   const handleCreateDocument = async () => {
     try {
       if (!projectId || !categoryId || !user) return;
       setSaving(true);
       setError(null);
-      
+
       // Generar slug a partir del título
       const slug = title
         .toLowerCase()
         .replace(/[^\w\s]/gi, '')
         .replace(/\s+/g, '-');
-      
+
       // 1. Crear documento
       const { data: docData, error: docError } = await supabase
         .from('documents')
@@ -249,9 +251,9 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
         })
         .select()
         .single();
-      
+
       if (docError) throw docError;
-      
+
       // 2. Crear versión inicial
       const { error: versionError } = await supabase
         .from('document_versions')
@@ -263,9 +265,9 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
           created_by: user.id,
           is_published: false
         });
-      
+
       if (versionError) throw versionError;
-      
+
       // Callback opcional para el padre
       if (onSave && docData) {
         onSave(docData);
@@ -277,11 +279,11 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
       setSaving(false);
     }
   };
-  
+
   const handleEditorChange = (newContent: any) => {
     setContent(newContent);
   };
-  
+
   // Si el editor no se pudo crear, mostrar un mensaje de error
   if (!editor) {
     return (
@@ -290,7 +292,7 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
       </div>
     );
   }
-  
+
   return (
     <div className="max-w-screen-xl mx-auto">
       {error && (
@@ -298,16 +300,16 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
           {error}
         </div>
       )}
-      
+
       {!documentId && (
         <div className="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
           <div className="mb-4">
             <label htmlFor="title" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               Título del documento*
             </label>
-            <input 
+            <input
               id="title"
-              type="text" 
+              type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Título del documento"
@@ -315,14 +317,14 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
               required
             />
           </div>
-          
+
           <div className="mb-4">
             <label htmlFor="description" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               Descripción
             </label>
-            <input 
+            <input
               id="description"
-              type="text" 
+              type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Breve descripción (opcional)"
@@ -331,13 +333,13 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
           </div>
         </div>
       )}
-      
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         {!readOnly && (
           <div className="border-b border-gray-200 dark:border-gray-700 p-3 flex justify-between items-center">
             <div className="flex items-center space-x-2">
               {documentId && (
-                <button 
+                <button
                   onClick={() => setShowVersionDialog(true)}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center transition-colors"
                   disabled={saving}
@@ -346,9 +348,9 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
                   {saving ? 'Guardando...' : 'Guardar versión'}
                 </button>
               )}
-              
+
               {!documentId && (
-                <button 
+                <button
                   onClick={handleCreateDocument}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={saving || !title}
@@ -358,7 +360,7 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
                 </button>
               )}
             </div>
-            
+
             {lastSaved && (
               <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
                 <Clock size={14} className="mr-1" />
@@ -367,7 +369,7 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
             )}
           </div>
         )}
-        
+
         <div className="py-4 px-14 w-full">
           {editorReady && (
             <YooptaEditor
@@ -385,7 +387,7 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
           )}
         </div>
       </div>
-      
+
       {/* Modal de versión */}
       {showVersionDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -393,12 +395,12 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
             <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
               Guardar nueva versión
             </h3>
-            
+
             <div className="mb-4">
               <label htmlFor="versionMessage" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Mensaje de la versión
               </label>
-              <textarea 
+              <textarea
                 id="versionMessage"
                 value={versionMessage}
                 onChange={(e) => setVersionMessage(e.target.value)}
@@ -407,16 +409,16 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
                 rows={3}
               />
             </div>
-            
+
             <div className="flex justify-end space-x-2">
-              <button 
+              <button
                 onClick={() => setShowVersionDialog(false)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-md hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
                 disabled={saving}
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 onClick={handleSaveVersion}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center transition-colors"
                 disabled={saving}

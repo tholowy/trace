@@ -10,6 +10,7 @@ import Image from '@yoopta/image';
 import { useEffect, useMemo, useState, type FC } from 'react';
 import mermaid from 'mermaid';
 import { ActivitySquareIcon } from 'lucide-react';
+import SubPagePlugin from '../editor/plugins/SubPagePlugin';
 
 // Configuración de Mermaid
 mermaid.initialize({
@@ -103,6 +104,7 @@ const DocumentViewer: FC<DocumentViewerProps> = ({ content }) => {
     MermaidViewPlugin,
     Table,
     Image,
+    SubPagePlugin
   ], []);
   
   // Crear el editor en modo solo lectura

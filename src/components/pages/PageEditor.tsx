@@ -16,8 +16,9 @@ import { Bold, Italic, CodeMark, Underline, Strike, Highlight } from '@yoopta/ma
 
 import { pageService } from '../../services/pageService';
 import { useAuth } from '../../context/AuthContext';
-import type { Page, PageType, CreatePageOptions } from '../../types';
-import { Save, Clock, Check, FileText, Folder, Database, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import type { Page, CreatePageOptions } from '../../types';
+import { Save, Clock, Check, FileText, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { SubPagePlugin } from '../editor/plugins/SubPagePlugin';
 
 const MARKS = [Bold, Italic, CodeMark, Underline, Strike, Highlight];
 
@@ -58,12 +59,11 @@ const PageEditor: FC<PageEditorProps> = ({
   const { user } = useAuth();
   const isEditing = Boolean(pageId);
   
-  // Form state
+  // Form state - SIMPLIFICADO SIN TIPOS DE PÁGINAS
   const [title, setTitle] = useState<string>(initialPage?.title || '');
   const [description, setDescription] = useState<string>(initialPage?.description || '');
   const [slug, setSlug] = useState<string>(initialPage?.slug || '');
   const [icon, setIcon] = useState<string>(initialPage?.icon || '');
-  const [pageType, setPageType] = useState<PageType>(initialPage?.page_type || 'content');
   const [isPublished, setIsPublished] = useState<boolean>(initialPage?.is_published || false);
   const [content, setContent] = useState<any>(initialPage?.content || {});
   
@@ -73,9 +73,9 @@ const PageEditor: FC<PageEditorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editorReady, setEditorReady] = useState<boolean>(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true); // State for sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   
-  // Editor plugins
+  // Editor plugins - CON SubPagePlugin integrado
   const plugins = useMemo(() => [
     Paragraph,
     Heading.HeadingOne,
@@ -96,6 +96,7 @@ const PageEditor: FC<PageEditorProps> = ({
     MermaidPlugin,
     Table,
     Image,
+    SubPagePlugin
   ], []);
   
   // Create editor instance
@@ -142,7 +143,6 @@ const PageEditor: FC<PageEditorProps> = ({
         title,
         description,
         icon,
-        page_type: pageType,
         is_published: isPublished
       });
       
@@ -172,7 +172,6 @@ const PageEditor: FC<PageEditorProps> = ({
           slug,
           icon,
           content,
-          page_type: pageType,
           is_published: isPublished
         });
         
@@ -190,7 +189,6 @@ const PageEditor: FC<PageEditorProps> = ({
           slug: slug || undefined,
           icon: icon || undefined,
           content,
-          page_type: pageType,
           is_published: isPublished,
           parent_page_id: parentPageId
         };
@@ -222,20 +220,6 @@ const PageEditor: FC<PageEditorProps> = ({
     setContent(newContent);
   };
   
-  // Get icon based on page type
-  const getPageTypeIcon = (type: PageType) => {
-    switch (type) {
-      case 'content':
-        return <FileText size={16} />;
-      case 'container':
-        return <Folder size={16} />;
-      case 'mixed':
-        return <Database size={16} />;
-      default:
-        return <FileText size={16} />;
-    }
-  };
-  
   if (!editor) {
     return (
       <div className="bg-destructive-100 text-destructive-700 dark:bg-destructive-900/20 dark:text-destructive-400 p-4 rounded-md">
@@ -260,7 +244,7 @@ const PageEditor: FC<PageEditorProps> = ({
         </button>
 
         {isSidebarOpen && (
-          <div className="pt-10"> {/* Add padding to avoid overlap with toggle button */}
+          <div className="pt-10">
             <h2 className="text-xl font-semibold mb-6 text-primary">Detalles de la Página</h2>
             <div className="space-y-6">
               <div>
@@ -312,22 +296,7 @@ const PageEditor: FC<PageEditorProps> = ({
                 />
               </div>
               
-              <div>
-                <label htmlFor="pageType" className="block mb-1 text-sm font-medium text-muted-foreground">
-                  Tipo de página
-                </label>
-                <select
-                  id="pageType"
-                  value={pageType}
-                  onChange={(e) => setPageType(e.target.value as PageType)}
-                  className="form-input"
-                  disabled={readOnly}
-                >
-                  <option value="content">📝 Contenido - Solo texto y contenido</option>
-                  <option value="container">📁 Contenedor - Solo para agrupar páginas</option>
-                  <option value="mixed">📊 Mixta - Contenido y subpáginas</option>
-                </select>
-              </div>
+              {/* SECCIÓN DE TIPO DE PÁGINA ELIMINADA */}
               
               <div>
                 <label htmlFor="icon" className="block mb-1 text-sm font-medium text-muted-foreground">
@@ -338,11 +307,14 @@ const PageEditor: FC<PageEditorProps> = ({
                   type="text" 
                   value={icon}
                   onChange={(e) => setIcon(e.target.value)}
-                  placeholder="✨"
+                  placeholder="📝"
                   className="form-input"
                   maxLength={2}
                   disabled={readOnly}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Emoji que representa esta página
+                </p>
               </div>
               
               <div className="flex items-center">
@@ -358,7 +330,6 @@ const PageEditor: FC<PageEditorProps> = ({
                   Página publicada
                 </label>
               </div>
-              
 
               {/* Editor Header */}
               {!readOnly && (
@@ -404,18 +375,32 @@ const PageEditor: FC<PageEditorProps> = ({
             {success}
           </div>
         )}
-        {/* Yoopta Editor */}
-        {(pageType === 'content' || pageType === 'mixed') ? (
-          <div className="flex-1 w-full bg-card rounded-lg shadow-sm p-8 pb-16 relative">
-            <div className="absolute top-8 left-8 text-2xl">
-              {icon}
+
+        {/* Editor Container */}
+        <div className="flex-1 w-full bg-card rounded-lg shadow-sm p-8 pb-16 relative">
+          {/* Page Header */}
+          <div className="mb-8">
+            <div className="flex items-start space-x-4">
+              {icon && (
+                <div className="text-4xl">
+                  {icon}
+                </div>
+              )}
+              <div className="flex-1">
+                <h1 className="text-4xl font-extrabold mb-2">
+                  {title || 'Título de la página'}
+                </h1>
+                {description && (
+                  <p className="text-lg text-muted-foreground">
+                    {description}
+                  </p>
+                )}
+              </div>
             </div>
-            <h1 className="text-4xl font-extrabold mb-4 pl-12">
-              {title || 'Título de la página'}
-            </h1>
-            <p className="text-lg text-muted-foreground mb-8 pl-12">
-              {description || 'Añade una descripción (opcional)'}
-            </p>
+          </div>
+
+          {/* Yoopta Editor con Plugin de Subpáginas Integrado */}
+          <div className="mb-8">
             <YooptaEditor
               editor={editor}
               plugins={plugins}
@@ -429,38 +414,25 @@ const PageEditor: FC<PageEditorProps> = ({
               style={{width: '100% ', height: 'calc(100vh-8rem)'}}
             />
           </div>
-        ) : (
-          <div className="flex-1 max-w-3xl mx-auto w-full bg-card rounded-lg shadow-sm p-8 pb-16 flex flex-col items-center justify-center text-center text-muted-foreground">
-            {getPageTypeIcon(pageType)}
-            <p className="mt-4 text-lg">
-              Esta página es de tipo "{pageType}". {pageType === 'container' ? 'No se puede añadir contenido directamente aquí, solo subpáginas.' : 'Puedes agregar contenido y subpáginas.'}
-            </p>
+
+          {/* Información sobre el sistema simplificado */}
+          <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <FileText size={20} className="text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                  💡 Sistema de Subpáginas Integrado
+                </h4>
+                <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  <p>• Escribe <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">/subpage</code> o <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">/pagina</code> para agregar una referencia a otra página</p>
+                  <p>• Las subpáginas aparecen como bloques dentro del contenido</p>
+                  <p>• Puedes elegir entre 3 modos: <strong>Enlace</strong>, <strong>Vista previa</strong> o <strong>Embebido</strong></p>
+                  <p>• El orden se controla arrastrando los bloques en el editor</p>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-        
-        {/* Action Buttons at the bottom */}
-        {/* {!readOnly && (
-          <div className="mt-8 flex justify-end space-x-3 max-w-3xl mx-auto w-full">
-            {onCancel && (
-              <button
-                onClick={onCancel}
-                className="btn-secondary"
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-            )}
-            
-            <button
-              onClick={handleSave}
-              className="btn-primary"
-              disabled={saving || !title.trim()}
-            >
-              <Check size={16} className="mr-1.5" />
-              {saving ? 'Guardando...' : (isEditing ? 'Guardar cambios' : 'Crear página')}
-            </button>
-          </div>
-        )} */}
+        </div>
       </main>
     </div>
   );

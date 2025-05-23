@@ -1,7 +1,7 @@
 
 // Tipos específicos para la integración con Supabase
 
-import type { Attachment, Category, DocumentVersion, Project, ProjectMember, Role, SearchResult, UserProfile, UserRole } from ".";
+import type { Attachment, Category, DocumentVersion, Project, ProjectMember, Role, UserProfile, UserRole } from ".";
 
 export type Tables = {
   projects: Project;

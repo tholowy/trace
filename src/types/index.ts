@@ -1,6 +1,10 @@
-// Tipos globales para la aplicación
+// ===============================================================
+// TIPOS TYPESCRIPT COMPLETOS Y ORGANIZADOS
+// Sistema simplificado de páginas con subpáginas como bloques Yoopta
+// ===============================================================
 
-// Tipos para usuarios y autenticación
+// =============== TIPOS BASE DE USUARIOS Y AUTENTICACIÓN ===============
+
 export interface User {
   id: string;
   email: string;
@@ -32,7 +36,22 @@ export interface UserRole {
   created_at: string;
 }
 
-// Tipos para proyectos
+export interface AuthContextType {
+  user: User | null;
+  userProfile: UserProfile | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ data: any; error: any }>;
+  signup: (email: string, password: string, userData?: any) => Promise<{ data: any; error: any }>;
+  logout: () => Promise<{ error: any }>;
+  updateProfile: (profileData: Partial<UserProfile>) => Promise<{ data: UserProfile | null; error: any }>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
+  updatePassword: (password: string) => Promise<{ error: any }>;
+  getUserRoles: () => Promise<{ data: Role[] | null; error: any }>;
+  refreshSession: () => Promise<{ success: boolean; error: any }>;
+}
+
+// =============== TIPOS BASE DE PROYECTOS ===============
+
 export interface Project {
   id: string;
   name: string;
@@ -43,6 +62,8 @@ export interface Project {
   created_at: string;
   updated_at: string;
   created_by: string;
+  
+  // Información relacionada (opcional)
   created_by_user?: {
     email: string;
     user_profiles?: UserProfile[];
@@ -55,6 +76,8 @@ export interface ProjectMember {
   user_id: string;
   permission_level: 'viewer' | 'editor' | 'admin';
   created_at: string;
+  
+  // Información relacionada (opcional)
   user?: {
     id: string;
     email: string;
@@ -62,8 +85,71 @@ export interface ProjectMember {
   };
 }
 
+export interface ProjectStats {
+  id: string;
+  name: string;
+  slug: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  members_count: number;
+  pages_count: number;
+  versions_count: number;
+  published_pages_count: number;
+  last_page_update?: string;
+}
 
-export type PageType = 'container' | 'content' | 'mixed';
+// =============== TIPOS PARA CONTENIDO YOOPTA ===============
+
+export interface YooptaContent {
+  blocks: Record<string, YooptaBlock>;
+  version?: string;
+}
+
+export interface YooptaBlock {
+  type: string;
+  data: any;
+  meta?: {
+    order: number;
+    depth?: number;
+  };
+}
+
+// Bloque especial para subpáginas
+export interface SubPageBlock extends YooptaBlock {
+  type: 'sub-page';
+  data: {
+    page_id: string;
+    title: string;
+    preview?: string;
+    display_mode: SubPageDisplayMode;
+    order: number;
+    icon?: string;
+    description?: string;
+  };
+}
+
+export type SubPageDisplayMode = 'inline' | 'embedded' | 'link';
+
+// Props para el componente de bloque subpágina
+export interface SubPageBlockProps {
+  block: SubPageBlock;
+  editor: any;
+  readOnly?: boolean;
+  onPageSelect?: (pageId: string) => void;
+  onEditPage?: (pageId: string) => void;
+}
+
+// Configuración del plugin de subpáginas
+export interface SubPagePluginConfig {
+  projectId: string;
+  onPageCreate?: (parentId: string) => Promise<Page>;
+  onPageSelect?: (page: Page) => void;
+  allowedDisplayModes?: SubPageDisplayMode[];
+  maxDepth?: number;
+}
+
+// =============== TIPOS PRINCIPALES DE PÁGINAS ===============
 
 export interface Page {
   id: string;
@@ -71,25 +157,23 @@ export interface Page {
   parent_page_id?: string;
   title: string;
   slug: string;
-  content?: any; // Contenido Yoopta (puede ser null si es solo contenedor)
+  content?: YooptaContent | null;
   description?: string;
-  icon?: string; // Emoji o icono
+  icon?: string;
   is_published: boolean;
   order_index: number;
-  page_type: PageType;
   created_at: string;
   updated_at: string;
   created_by: string;
   updated_by?: string;
   
-  // Propiedades calculadas (no están en la DB, se agregan en runtime)
-  children?: Page[]; // Sub-páginas
-  path?: string; // Ruta completa: "/getting-started/installation"
-  level?: number; // Nivel de anidación (0 = raíz)
-  has_content?: boolean; // Si tiene contenido o es solo contenedor
-  children_count?: number; // Número de páginas hijas
+  // Propiedades calculadas (no están en DB)
+  children?: Page[];
+  path?: string;
+  level?: number;
+  has_subpage_blocks?: boolean;
   
-  // Información relacionada (desde JOINs)
+  // Información relacionada (opcional)
   project?: {
     id: string;
     name: string;
@@ -111,13 +195,54 @@ export interface Page {
   };
 }
 
-// =============== TIPOS PARA VERSIONADO DE PROYECTOS ===============
+export interface PageTreeNode {
+  id: string;
+  title: string;
+  slug: string;
+  icon?: string;
+  is_published: boolean;
+  order_index: number;
+  level: number;
+  path: string;
+  parent_id?: string;
+  has_subpage_blocks: boolean;
+  children: PageTreeNode[];
+  content_children?: PageReference[];
+}
+
+export interface PageReference {
+  page_id: string;
+  title: string;
+  display_mode: SubPageDisplayMode;
+  order_in_content: number;
+  preview?: string;
+}
+
+export interface ExtractedSubPageReference {
+  block_id: string;
+  page_id: string;
+  title: string;
+  display_mode: SubPageDisplayMode;
+  order: number;
+}
+
+export interface PageStats {
+  page_id: string;
+  views_count: number;
+  comments_count: number;
+  links_count: number;
+  children_count: number;
+  last_viewed?: string;
+  average_reading_time?: number;
+}
+
+// =============== TIPOS PARA VERSIONADO ===============
 
 export interface ProjectVersion {
   id: string;
   project_id: string;
   version_number: string; // "3.7.0"
-  version_name?: string; // "Winter Release", "Bug Fixes", etc.
+  version_name?: string; // "Winter Release"
   is_current: boolean;
   is_archived: boolean;
   is_draft: boolean;
@@ -145,9 +270,9 @@ export interface PageVersion {
   id: string;
   project_version_id: string;
   page_id: string;
-  content_snapshot?: any; // Snapshot del contenido en esta versión
-  title_snapshot: string; // Título en esta versión
-  description_snapshot?: string; // Descripción en esta versión
+  content_snapshot?: any;
+  title_snapshot: string;
+  description_snapshot?: string;
   created_at: string;
   
   // Información relacionada
@@ -160,7 +285,38 @@ export interface PageVersion {
   };
 }
 
-// =============== TIPOS PARA BÚSQUEDA ACTUALIZADA ===============
+export interface VersionStats {
+  version_id: string;
+  pages_count: number;
+  published_pages_count: number;
+  total_views: number;
+  creation_date: string;
+  publish_date?: string;
+}
+
+// =============== TIPOS PARA NAVEGACIÓN ===============
+
+export interface BreadcrumbItem {
+  id: string;
+  title: string;
+  slug: string;
+  path: string;
+  level: number;
+}
+
+export interface NavigationContext {
+  current_page: Page;
+  breadcrumbs: BreadcrumbItem[];
+  tree_children: Page[];
+  content_children: PageReference[];
+  siblings: Page[];
+  next_page?: Page;
+  previous_page?: Page;
+  project: Project;
+  version?: ProjectVersion;
+}
+
+// =============== TIPOS PARA BÚSQUEDA ===============
 
 export interface PageSearchResult {
   id: string;
@@ -170,12 +326,27 @@ export interface PageSearchResult {
   project_name: string;
   updated_at: string;
   rank: number;
-  path: string; // Ruta completa de la página
-  page_type: PageType;
+  path: string;
   has_content: boolean;
 }
 
-// =============== TIPOS PARA PUBLICACIÓN Y SITIOS PÚBLICOS ===============
+export interface SearchFilters {
+  query?: string;
+  project_ids?: string[];
+  tags?: string[];
+  created_after?: string;
+  created_before?: string;
+  updated_after?: string;
+  updated_before?: string;
+  is_published?: boolean;
+}
+
+export interface SortOptions {
+  field: 'title' | 'created_at' | 'updated_at' | 'order_index';
+  direction: 'asc' | 'desc';
+}
+
+// =============== TIPOS PARA PUBLICACIÓN ===============
 
 export interface PublicSite {
   id: string;
@@ -218,300 +389,6 @@ export interface AccessToken {
   page?: Page;
 }
 
-// =============== TIPOS AUXILIARES ACTUALIZADOS ===============
-
-// Archivos adjuntos (ahora vinculados a páginas en lugar de documentos)
-export interface Attachment {
-  id: string;
-  page_id?: string;
-  project_id: string;
-  file_path: string;
-  file_name: string;
-  file_size: number;
-  file_type: string;
-  description?: string;
-  is_public: boolean;
-  created_at: string;
-  created_by: string;
-  
-  // Información relacionada
-  page?: {
-    id: string;
-    title: string;
-  };
-}
-
-// Comentarios (ahora en páginas en lugar de documentos)
-export interface Comment {
-  id: string;
-  page_id: string;
-  parent_id?: string;
-  content: string;
-  resolved: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by?: string;
-  
-  // Información relacionada
-  page?: {
-    id: string;
-    title: string;
-  };
-  created_by_user?: {
-    email: string;
-    user_profiles?: UserProfile[];
-  };
-  replies?: Comment[];
-}
-
-// Enlaces entre páginas (actualizado)
-export interface PageLink {
-  id: string;
-  source_page_id: string;
-  target_page_id: string;
-  link_text?: string;
-  created_at: string;
-  created_by: string;
-  
-  // Información relacionada
-  source_page?: Page;
-  target_page?: Page;
-}
-
-// Etiquetas para páginas
-export interface Tag {
-  id: string;
-  project_id: string;
-  name: string;
-  color?: string;
-  created_at: string;
-  
-  // Propiedades calculadas
-  pages_count?: number;
-}
-
-export interface PageTag {
-  id: string;
-  page_id: string;
-  tag_id: string;
-  created_at: string;
-  created_by: string;
-  
-  // Información relacionada
-  tag?: Tag;
-  page?: Page;
-}
-
-// Vistas de páginas (actualizado)
-export interface PageView {
-  id: string;
-  page_id: string;
-  project_version_id?: string;
-  user_id?: string;
-  ip_address?: string;
-  user_agent?: string;
-  referrer?: string;
-  created_at: string;
-}
-
-// =============== TIPOS PARA NAVEGACIÓN Y UI ===============
-
-// Árbol de páginas para navegación
-export interface PageTreeNode {
-  id: string;
-  title: string;
-  description?: string;
-  slug: string;
-  icon?: string;
-  page_type: PageType;
-  has_content: boolean;
-  is_published: boolean;
-  order_index: number;
-  level: number;
-  path: string;
-  children: PageTreeNode[];
-  parent_id?: string;
-}
-
-// Breadcrumbs para navegación
-export interface BreadcrumbItem {
-  id: string;
-  title: string;
-  slug: string;
-  path: string;
-  level: number;
-}
-
-// Información de navegación completa
-export interface NavigationContext {
-  current_page: Page;
-  breadcrumbs: BreadcrumbItem[];
-  page_tree: PageTreeNode[];
-  siblings: Page[];
-  next_page?: Page;
-  previous_page?: Page;
-  project: Project;
-  project_version?: ProjectVersion;
-}
-
-// =============== TIPOS PARA COMPONENTES Y PROPS ===============
-
-// Props para el editor de páginas
-export interface PageEditorProps {
-  pageId?: string;
-  projectId: string;
-  parentPageId?: string;
-  initialContent?: any;
-  pageType?: PageType;
-  onSave?: (page: Page) => void;
-  readOnly?: boolean;
-}
-
-// Props para el árbol de navegación
-export interface PageTreeProps {
-  projectId: string;
-  projectVersionId?: string;
-  selectedPageId?: string;
-  onPageSelect?: (page: Page) => void;
-  onPageMove?: (pageId: string, newParentId?: string, newIndex?: number) => void;
-  onPageCreate?: (parentId?: string) => void;
-  expandedNodes?: Set<string>;
-  onToggleNode?: (nodeId: string) => void;
-  enableDragAndDrop?: boolean;
-  showCreateButtons?: boolean;
-}
-
-// Props para el selector de versión
-export interface VersionSelectorProps {
-  projectId: string;
-  currentVersionId?: string;
-  onVersionChange?: (version: ProjectVersion) => void;
-  showDrafts?: boolean;
-  showArchived?: boolean;
-}
-
-// Props para el visor público
-export interface PublicPageViewerProps {
-  projectSlug: string;
-  versionNumber?: string;
-  pagePath?: string;
-  publicSite?: PublicSite;
-}
-
-// =============== TIPOS PARA SERVICIOS Y RESPUESTAS ===============
-
-// Respuesta estándar de servicios
-export interface ServiceResponse<T> {
-  data: T | null;
-  error: any;
-}
-
-// Opciones para crear página
-export interface CreatePageOptions {
-  title: string;
-  slug?: string;
-  content?: any;
-  description?: string;
-  icon?: string;
-  page_type: PageType;
-  parent_page_id?: string;
-  order_index?: number;
-  is_published?: boolean;
-}
-
-// Opciones para mover página
-export interface MovePageOptions {
-  new_parent_id?: string;
-  new_order_index?: number;
-}
-
-// Opciones para duplicar página
-export interface DuplicatePageOptions {
-  new_title?: string;
-  new_parent_id?: string;
-  include_children?: boolean;
-}
-
-// Opciones para crear versión de proyecto
-export interface CreateVersionOptions {
-  version_number: string;
-  version_name?: string;
-  release_notes?: string;
-  include_drafts?: boolean;
-}
-
-// Opciones para búsqueda de páginas
-export interface SearchPagesOptions {
-  query: string;
-  project_id?: string;
-  project_version_id?: string;
-  page_type?: PageType;
-  only_published?: boolean;
-  limit?: number;
-  offset?: number;
-}
-
-// =============== TIPOS PARA AUTENTICACIÓN Y CONTEXTO ===============
-
-// Contexto de autenticación actualizado
-export interface AuthContextType {
-  user: User | null;
-  userProfile: UserProfile | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<{ data: any; error: any }>;
-  signup: (email: string, password: string, userData?: any) => Promise<{ data: any; error: any }>;
-  logout: () => Promise<{ error: any }>;
-  updateProfile: (profileData: Partial<UserProfile>) => Promise<{ data: UserProfile | null; error: any }>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
-  updatePassword: (password: string) => Promise<{ error: any }>;
-  getUserRoles: () => Promise<{ data: Role[] | null; error: any }>;
-  refreshSession: () => Promise<{ success: boolean; error: any }>;
-}
-
-// Contexto de tema (se mantiene igual)
-export interface ThemeContextType {
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
-}
-
-// =============== TIPOS PARA ESTADÍSTICAS Y ANALYTICS ===============
-
-export interface ProjectStats {
-  id: string;
-  name: string;
-  slug: string;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-  members_count: number;
-  pages_count: number;
-  versions_count: number;
-  published_pages_count: number;
-  last_page_update?: string;
-}
-
-export interface PageStats {
-  page_id: string;
-  views_count: number;
-  comments_count: number;
-  links_count: number;
-  children_count: number;
-  last_viewed?: string;
-  average_reading_time?: number;
-}
-
-export interface VersionStats {
-  version_id: string;
-  pages_count: number;
-  published_pages_count: number;
-  total_views: number;
-  creation_date: string;
-  publish_date?: string;
-}
-
-// =============== TIPOS PARA CONFIGURACIÓN Y PERSONALIZACIÓN ===============
-
 export interface SiteTheme {
   primary_color: string;
   secondary_color: string;
@@ -549,7 +426,261 @@ export interface SiteSettings {
   custom_js?: string;
 }
 
-// =============== TIPOS PARA IMPORTACIÓN Y EXPORTACIÓN ===============
+// =============== TIPOS AUXILIARES ===============
+
+export interface Attachment {
+  id: string;
+  page_id?: string;
+  project_id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  description?: string;
+  is_public: boolean;
+  created_at: string;
+  created_by: string;
+  
+  // Información relacionada
+  page?: {
+    id: string;
+    title: string;
+  };
+}
+
+export interface Comment {
+  id: string;
+  page_id: string;
+  parent_id?: string;
+  content: string;
+  resolved: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by?: string;
+  
+  // Información relacionada
+  page?: {
+    id: string;
+    title: string;
+  };
+  created_by_user?: {
+    email: string;
+    user_profiles?: UserProfile[];
+  };
+  replies?: Comment[];
+}
+
+export interface PageLink {
+  id: string;
+  source_page_id: string;
+  target_page_id: string;
+  link_text?: string;
+  created_at: string;
+  created_by: string;
+  
+  // Información relacionada
+  source_page?: Page;
+  target_page?: Page;
+}
+
+export interface Tag {
+  id: string;
+  project_id: string;
+  name: string;
+  color?: string;
+  created_at: string;
+  
+  // Propiedades calculadas
+  pages_count?: number;
+}
+
+export interface PageTag {
+  id: string;
+  page_id: string;
+  tag_id: string;
+  created_at: string;
+  created_by: string;
+  
+  // Información relacionada
+  tag?: Tag;
+  page?: Page;
+}
+
+export interface PageView {
+  id: string;
+  page_id: string;
+  project_version_id?: string;
+  user_id?: string;
+  ip_address?: string;
+  user_agent?: string;
+  referrer?: string;
+  created_at: string;
+}
+
+// =============== TIPOS PARA SERVICIOS ===============
+
+export interface ServiceResponse<T> {
+  data: T | null;
+  error: any;
+}
+
+export interface LoadingState<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+}
+
+// =============== TIPOS PARA OPCIONES DE SERVICIOS ===============
+
+export interface CreatePageOptions {
+  title: string;
+  slug?: string;
+  content?: YooptaContent | null;
+  description?: string;
+  icon?: string;
+  parent_page_id?: string;
+  order_index?: number;
+  is_published?: boolean;
+}
+
+export interface MovePageOptions {
+  new_parent_id?: string;
+  new_order_index?: number;
+}
+
+export interface DuplicatePageOptions {
+  new_title?: string;
+  new_parent_id?: string;
+  include_children?: boolean;
+}
+
+export interface SearchPagesOptions {
+  query: string;
+  project_id?: string;
+  only_published?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AddSubPageBlockOptions {
+  parent_page_id: string;
+  child_page_id: string;
+  display_mode: SubPageDisplayMode;
+  order_in_content: number;
+  insert_after_block?: string;
+}
+
+export interface CreateVersionOptions {
+  version_number: string;
+  version_name?: string;
+  release_notes?: string;
+  include_drafts?: boolean;
+}
+
+// =============== TIPOS PARA OPERACIONES DE CONTENIDO ===============
+
+export interface ContentOperations {
+  extractSubPageReferences: (content: YooptaContent | null) => ExtractedSubPageReference[];
+  addSubPageBlock: (content: YooptaContent, options: AddSubPageBlockOptions) => YooptaContent;
+  removeSubPageBlock: (content: YooptaContent, blockId: string) => YooptaContent;
+  updateSubPageBlock: (content: YooptaContent, blockId: string, updates: Partial<SubPageBlock['data']>) => YooptaContent;
+  reorderSubPageBlocks: (content: YooptaContent, blockOrders: Array<{blockId: string, order: number}>) => YooptaContent;
+}
+
+export interface CircularReferenceCheck {
+  isCircular: boolean;
+  path: string[];
+  conflictingPageId?: string;
+}
+
+export interface DepthCalculation {
+  maxDepth: number;
+  deepestPath: string[];
+  pageCount: number;
+}
+
+// =============== TIPOS PARA PROPS DE COMPONENTES ===============
+
+export interface PageEditorProps {
+  pageId?: string;
+  projectId: string;
+  parentPageId?: string;
+  initialContent?: YooptaContent;
+  onSave?: (page: Page) => void;
+  readOnly?: boolean;
+}
+
+export interface PageTreeProps {
+  projectId: string;
+  selectedPageId?: string;
+  onPageSelect?: (page: Page) => void;
+  onPageMove?: (pageId: string, newParentId?: string, newIndex?: number) => void;
+  onPageCreate?: (parentId?: string) => void;
+  expandedNodes?: Set<string>;
+  onToggleNode?: (nodeId: string) => void;
+  enableDragAndDrop?: boolean;
+  showCreateButtons?: boolean;
+}
+
+export interface VersionSelectorProps {
+  projectId: string;
+  currentVersionId?: string;
+  onVersionChange?: (version: ProjectVersion) => void;
+  showDrafts?: boolean;
+  showArchived?: boolean;
+}
+
+export interface PublicPageViewerProps {
+  projectSlug: string;
+  versionNumber?: string;
+  pagePath?: string;
+  publicSite?: PublicSite;
+}
+
+export interface PageSelectorProps {
+  projectId: string;
+  excludePageIds?: string[];
+  onPageSelect: (page: Page) => void;
+  allowCreateNew?: boolean;
+  maxDepth?: number;
+}
+
+export interface PagePreviewProps {
+  pageId: string;
+  displayMode: SubPageDisplayMode;
+  compact?: boolean;
+  showActions?: boolean;
+  onEdit?: () => void;
+  onRemove?: () => void;
+}
+
+// =============== TIPOS PARA ESTADO DE COMPONENTES ===============
+
+export interface PageEditorState {
+  currentPage: Page;
+  contentPages: PageReference[];
+  availablePages: Page[];
+  isCreatingSubPage: boolean;
+  selectedSubPageBlock?: string;
+}
+
+export interface ThemeContextType {
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
+}
+
+// =============== TIPOS PARA IMPORTACIÓN/EXPORTACIÓN ===============
 
 export interface ExportOptions {
   format: 'json' | 'markdown' | 'html' | 'pdf';
@@ -569,7 +700,7 @@ export interface ImportOptions {
   create_version: boolean;
 }
 
-// =============== TIPOS PARA WEBHOOKS Y INTEGRACIONES ===============
+// =============== TIPOS PARA INTEGRACIONES ===============
 
 export interface WebhookEvent {
   id: string;
@@ -600,7 +731,7 @@ export interface PageTemplate {
   name: string;
   description?: string;
   category: 'documentation' | 'tutorial' | 'api' | 'changelog' | 'custom';
-  content_template: any; // Estructura Yoopta
+  content_template: YooptaContent;
   variables?: Array<{
     name: string;
     type: 'text' | 'image' | 'link' | 'date';
@@ -654,9 +785,21 @@ export interface Notification {
   action_url?: string;
 }
 
+// =============== TIPOS PARA VALIDACIÓN ===============
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+}
+
+export interface ValidationResult {
+  is_valid: boolean;
+  errors: ValidationError[];
+}
+
 // =============== TIPOS LEGACY (PARA MIGRACIÓN) ===============
 
-// Estos tipos se mantienen temporalmente para facilitar la migración
 export interface Category {
   id: string;
   project_id: string;
@@ -698,54 +841,160 @@ export interface DocumentVersion {
   is_published: boolean;
 }
 
-// =============== TIPOS UTILITARIOS ===============
-
-// Tipo genérico para estado de carga
-export interface LoadingState<T> {
-  data: T | null;
-  loading: boolean;
-  error: string | null;
+export interface LegacyMigrationMap {
+  categories_to_pages: Array<{
+    old_category_id: string;
+    new_page_id: string;
+    content_includes_children: boolean;
+  }>;
+  documents_to_pages: Array<{
+    old_document_id: string;
+    new_page_id: string;
+    parent_page_id?: string;
+    referenced_in_parent?: boolean;
+  }>;
 }
 
-// Tipo para respuestas paginadas
-export interface PaginatedResponse<T> {
-  data: T[];
-  count: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-  has_next: boolean;
-  has_previous: boolean;
+// =============== TIPOS PARA SUPABASE DATABASE ===============
+
+export interface Database {
+  public: {
+    Tables: {
+      projects: {
+        Row: Project;
+        Insert: Omit<Project, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Project, 'id' | 'created_at'>>;
+      };
+      pages: {
+        Row: Page;
+        Insert: Omit<Page, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Page, 'id' | 'created_at'>>;
+      };
+      project_versions: {
+        Row: ProjectVersion;
+        Insert: Omit<ProjectVersion, 'id' | 'created_at'>;
+        Update: Partial<Omit<ProjectVersion, 'id' | 'created_at'>>;
+      };
+      page_versions: {
+        Row: PageVersion;
+        Insert: Omit<PageVersion, 'id' | 'created_at'>;
+        Update: Partial<Omit<PageVersion, 'id' | 'created_at'>>;
+      };
+      public_sites: {
+        Row: PublicSite;
+        Insert: Omit<PublicSite, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<PublicSite, 'id' | 'created_at'>>;
+      };
+      // Agregar más tablas según sea necesario
+    };
+    Views: {
+      [key: string]: any;
+    };
+    Functions: {
+      get_page_tree_simple: {
+        Args: {
+          project_id_param: string;
+          project_version_id_param?: string;
+        };
+        Returns: PageTreeNode[];
+      };
+      search_pages: {
+        Args: {
+          search_term: string;
+          project_id_param?: string;
+          only_published_param?: boolean;
+          limit_param?: number;
+          offset_param?: number;
+        };
+        Returns: PageSearchResult[];
+      };
+    };
+  };
 }
 
-// Tipo para filtros de búsqueda
-export interface SearchFilters {
-  query?: string;
-  project_ids?: string[];
-  page_types?: PageType[];
-  tags?: string[];
-  created_after?: string;
-  created_before?: string;
-  updated_after?: string;
-  updated_before?: string;
-  is_published?: boolean;
-}
+// =============== EJEMPLO DE USO COMPLETO ===============
 
-// Tipo para ordenamiento
-export interface SortOptions {
-  field: 'title' | 'created_at' | 'updated_at' | 'order_index';
-  direction: 'asc' | 'desc';
-}
+export const ExampleYooptaContent: YooptaContent = {
+  blocks: {
+    "intro-paragraph": {
+      type: "paragraph",
+      data: { text: "Esta es la introducción de nuestra documentación." },
+      meta: { order: 0 }
+    },
+    "getting-started-subpage": {
+      type: "sub-page",
+      data: {
+        page_id: "uuid-getting-started",
+        title: "Guía de Inicio Rápido",
+        preview: "Aprende los conceptos básicos en 5 minutos...",
+        display_mode: "embedded" as SubPageDisplayMode,
+        order: 1,
+        icon: "🚀",
+        description: "Todo lo que necesitas para empezar"
+      },
+      meta: { order: 1 }
+    },
+    "middle-content": {
+      type: "paragraph",
+      data: { text: "Aquí va contenido adicional entre subpáginas." },
+      meta: { order: 2 }
+    },
+    "advanced-topics-subpage": {
+      type: "sub-page", 
+      data: {
+        page_id: "uuid-advanced-topics",
+        title: "Temas Avanzados",
+        preview: "Configuración avanzada y casos de uso...",
+        display_mode: "link" as SubPageDisplayMode,
+        order: 3,
+        icon: "⚙️",
+        description: "Para usuarios experimentados"
+      },
+      meta: { order: 3 }
+    }
+  },
+  version: "1.0.0"
+};
 
-// =============== TIPOS PARA VALIDACIÓN ===============
+// =============== EXPORTS PRINCIPALES ===============
 
-export interface ValidationError {
-  field: string;
-  message: string;
-  code: string;
-}
-
-export interface ValidationResult {
-  is_valid: boolean;
-  errors: ValidationError[];
-}
+// // Re-exportar tipos más utilizados para fácil importación
+// export type {
+//   // Tipos core
+//   Page,
+//   Project,
+//   User,
+  
+//   // Tipos de contenido
+//   YooptaContent,
+//   SubPageBlock,
+//   SubPageDisplayMode,
+  
+//   // Tipos de servicios
+//   ServiceResponse,
+//   CreatePageOptions,
+//   SearchPagesOptions,
+  
+//   // Tipos de componentes
+//   PageTreeProps,
+//   PageEditorProps,
+//   SubPageBlockProps,
+  
+//   // Tipos de navegación
+//   PageTreeNode,
+//   NavigationContext,
+//   BreadcrumbItem,
+  
+//   // Tipos de versionado
+//   ProjectVersion,
+//   PageVersion,
+  
+//   // Tipos de publicación
+//   PublicSite,
+//   AccessToken,
+  
+//   // Tipos auxiliares
+//   LoadingState,
+//   PaginatedResponse,
+//   ValidationResult
+// };

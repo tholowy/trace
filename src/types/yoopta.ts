@@ -1,15 +1,15 @@
-// Tipos para la integración con Yoopta.dev
+// =============== TIPOS PARA YOOPTA INTEGRATION ===============
 
-// Tipos para YooptaEditor
+import type { YooptaContent } from ".";
+
 export interface YooptaEditorProps {
   store: any;
-  defaultValue?: any;
-  onChange?: (content: any) => void;
+  defaultValue?: YooptaContent;
+  onChange?: (content: YooptaContent) => void;
   className?: string;
   readOnly?: boolean;
 }
 
-// Tipos para extensiones
 export interface YooptaExtension {
   type: string;
   name: string;
