@@ -18,13 +18,13 @@ const GlobalSearch = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
-  
+
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const debouncedQuery = useDebounce(query, 300);
-  
-  // Cargar búsquedas recientes del localStorage al iniciar
+
+  // Load recent searches from localStorage on component mount
   useEffect(() => {
     const saved = localStorage.getItem('recentSearches');
     if (saved) {
@@ -35,47 +35,48 @@ const GlobalSearch = () => {
       }
     }
   }, []);
-  
-  // Cerrar el modal al hacer clic fuera
+
+  // Close the modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-  
-  // Control de teclas para navegación
+
+  // Keyboard controls for navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent<Document>) => {
       if (!isOpen) return;
-      
-      // Cerrar con Escape
+
+      // Close with Escape
       if (e.key === 'Escape') {
         setIsOpen(false);
         return;
       }
-      
-      // Navegación con flechas
+
+      // Navigation with arrow keys
+      const totalItems = results.length + recentSearches.length;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex(prev => 
-          prev < results.length + recentSearches.length - 1 ? prev + 1 : 0
+        setSelectedIndex(prev =>
+          prev < totalItems - 1 ? prev + 1 : 0
         );
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex(prev => 
-          prev > 0 ? prev - 1 : results.length + recentSearches.length - 1
+        setSelectedIndex(prev =>
+          prev > 0 ? prev - 1 : totalItems - 1
         );
-      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && totalItems > 0) {
         e.preventDefault();
-        
-        // Determinar si es un resultado o una búsqueda reciente
+
+        // Determine if it's a search result or a recent search
         if (selectedIndex < results.length) {
           handleSelectResult(results[selectedIndex]);
         } else {
@@ -83,154 +84,161 @@ const GlobalSearch = () => {
           if (recentIndex >= 0 && recentIndex < recentSearches.length) {
             setQuery(recentSearches[recentIndex].query);
             searchDocuments(recentSearches[recentIndex].query);
+            setIsOpen(false); // Close after selecting a recent search to re-run query
           }
         }
       }
     };
-    
-    // TypeScript no permite establecer el tipo correcto en el evento, así que usamos un cast
+
     document.addEventListener('keydown', handleKeyDown as unknown as EventListener);
     return () => {
       document.removeEventListener('keydown', handleKeyDown as unknown as EventListener);
     };
-  }, [isOpen, results, recentSearches, selectedIndex]);
-  
-  // Enfocar el input al abrir el modal
+  }, [isOpen, results, recentSearches, selectedIndex, navigate]); // Added navigate to dependencies
+
+  // Focus the input when the modal opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
+      setSelectedIndex(0); // Reset selection when opening
     }
   }, [isOpen]);
-  
-  // Búsqueda de documentos
+
+  // Document search function
   const searchDocuments = async (searchTerm: string) => {
     if (!searchTerm || searchTerm.trim().length < 2) {
       setResults([]);
+      setLoading(false); // Ensure loading is false if query is too short
       return;
     }
-    
+
     try {
       setLoading(true);
-      
-      // Llamar a la función de búsqueda de Supabase
+
+      // Call Supabase search function
       const { data, error } = await supabase.rpc('search_documents', {
         search_term: searchTerm,
         limit_param: 10,
         offset_param: 0
       });
-      
+
       if (error) throw error;
-      
+
       setResults(data || []);
-      
-      // Guardar en búsquedas recientes
+
+      // Save to recent searches
       if (searchTerm.trim().length > 0) {
-        const newSearch: RecentSearch = { 
+        const newSearch: RecentSearch = {
           id: Date.now().toString(),
-          query: searchTerm, 
-          timestamp: new Date().toISOString() 
+          query: searchTerm,
+          timestamp: new Date().toISOString()
         };
-        
+
         const updatedSearches = [
           newSearch,
-          ...recentSearches.filter(s => s.query !== searchTerm).slice(0, 4)
+          ...recentSearches.filter(s => s.query.toLowerCase() !== searchTerm.toLowerCase()).slice(0, 4)
         ];
-        
+
         setRecentSearches(updatedSearches);
         localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
       }
     } catch (err) {
       console.error('Error searching documents:', err);
+      // Optionally set an error state for the user
     } finally {
       setLoading(false);
     }
   };
-  
-  // Efecto para buscar cuando cambia la consulta
+
+  // Effect to trigger search when debounced query changes
   useEffect(() => {
     if (isOpen && debouncedQuery) {
       searchDocuments(debouncedQuery);
+    } else if (!debouncedQuery && isOpen) {
+      setResults([]); // Clear results if query is empty
     }
   }, [debouncedQuery, isOpen]);
-  
-  // Manejar la selección de un resultado
+
+  // Handle selecting a search result
   const handleSelectResult = (result: SearchResult) => {
     navigate(`/projects/${result.project_id}/documents/${result.id}`);
     setIsOpen(false);
     setQuery('');
   };
-  
-  // Limpiar búsquedas recientes
+
+  // Clear recent searches
   const clearRecentSearches = () => {
     setRecentSearches([]);
     localStorage.removeItem('recentSearches');
   };
-  
-  // Manejar apertura con atajo de teclado
+
+  // Handle opening with keyboard shortcut
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Abrir con Ctrl+K o Cmd+K
+      // Open with Ctrl+K or Cmd+K
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         setIsOpen(prev => !prev);
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyPress as unknown as EventListener);
     return () => {
       window.removeEventListener('keydown', handleKeyPress as unknown as EventListener);
     };
   }, []);
-  
+
   return (
     <>
-      {/* Botón de búsqueda */}
+      {/* Search Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-md"
+        className="flex items-center text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 bg-secondary rounded-md shadow-sm transition-colors duration-200"
       >
-        <Search size={16} className="mr-2" />
-        Buscar...
-        <kbd className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">⌘K</kbd>
+        <Search size={16} className="mr-2 text-secondary-foreground" />
+        <span className="hidden sm:inline">Buscar documentación...</span>
+        <span className="sm:hidden">Buscar...</span>
+        <kbd className="ml-3 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
       </button>
-      
-      {/* Modal de búsqueda */}
+
+      {/* Search Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20 p-4 z-50">
-          <div 
+        <div className="fixed inset-0 bg-overlay flex items-start justify-center pt-16 sm:pt-20 p-4 z-50 animate-fade-in">
+          <div
             ref={searchRef}
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[70vh] overflow-hidden flex flex-col"
+            className="bg-card rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col border border-border animate-scale-in"
           >
-            {/* Barra de búsqueda */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center">
-              <Search size={18} className="text-gray-400 mr-2" />
+            {/* Search Input Bar */}
+            <div className="p-4 border-b border-border flex items-center">
+              <Search size={18} className="text-muted-foreground mr-3" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar en la documentación..."
-                className="flex-grow bg-transparent border-none outline-none text-gray-800 dark:text-white placeholder-gray-400"
+                onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }} // Reset index on query change
+                placeholder="Busca en la documentación..."
+                className="flex-grow bg-transparent border-none outline-none text-foreground placeholder-muted-foreground text-lg"
               />
               {query && (
-                <button 
+                <button
                   onClick={() => setQuery('')}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               )}
             </div>
-            
-            {/* Resultados de búsqueda */}
-            <div className="overflow-y-auto flex-grow">
+
+            {/* Search Results / Recent Searches */}
+            <div className="overflow-y-auto flex-grow custom-scrollbar">
               {loading ? (
-                <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                  Buscando...
+                <div className="flex justify-center items-center p-8 text-muted-foreground">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+                  <span>Buscando...</span>
                 </div>
               ) : query && results.length > 0 ? (
                 <div className="p-2">
-                  <h3 className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                  <h3 className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Resultados
                   </h3>
                   <ul>
@@ -238,19 +246,19 @@ const GlobalSearch = () => {
                       <li key={result.id}>
                         <button
                           onClick={() => handleSelectResult(result)}
-                          className={`w-full text-left px-3 py-2 rounded-md flex items-start ${
-                            selectedIndex === index 
-                              ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                              : 'hover:bg-gray-100 dark:hover:bg-gray-700/40'
-                          }`}
+                          className={`w-full text-left p-3 rounded-md flex items-start group transition-colors duration-200
+                            ${selectedIndex === index
+                              ? 'bg-primary/10 text-primary-foreground'
+                              : 'hover:bg-accent hover:text-accent-foreground'
+                            }`}
                         >
-                          <File size={16} className="mt-0.5 mr-2 flex-shrink-0 text-gray-400" />
+                          <File size={18} className="mt-0.5 mr-3 flex-shrink-0 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
                           <div>
-                            <div className="font-medium text-gray-800 dark:text-white">
+                            <div className="font-medium text-foreground group-hover:text-primary transition-colors duration-200">
                               {result.title}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {result.project_name} &rsaquo; {result.category_name}
+                            <div className="text-sm text-muted-foreground mt-1">
+                              <span className="font-medium">{result.project_name}</span> &rsaquo; {result.category_name}
                             </div>
                           </div>
                         </button>
@@ -260,16 +268,16 @@ const GlobalSearch = () => {
                 </div>
               ) : (
                 <div>
-                  {/* Búsquedas recientes */}
-                  {recentSearches.length > 0 && (
+                  {/* Recent Searches */}
+                  {recentSearches.length > 0 && !query && ( // Only show recent searches if query is empty
                     <div className="p-2">
-                      <div className="px-3 py-2 flex justify-between items-center">
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                      <div className="px-3 py-2 flex justify-between items-center border-b border-border-light mb-2">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Búsquedas recientes
                         </h3>
-                        <button 
+                        <button
                           onClick={clearRecentSearches}
-                          className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                          className="text-xs text-link hover:text-link-hover transition-colors duration-200"
                         >
                           Limpiar
                         </button>
@@ -281,15 +289,16 @@ const GlobalSearch = () => {
                               onClick={() => {
                                 setQuery(item.query);
                                 searchDocuments(item.query);
+                                setIsOpen(false); // Close after selecting
                               }}
-                              className={`w-full text-left px-3 py-2 rounded-md flex items-center ${
-                                selectedIndex === results.length + index 
-                                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                                  : 'hover:bg-gray-100 dark:hover:bg-gray-700/40'
-                              }`}
+                              className={`w-full text-left p-3 rounded-md flex items-center group transition-colors duration-200
+                                ${selectedIndex === results.length + index
+                                  ? 'bg-primary/10 text-primary-foreground'
+                                  : 'hover:bg-accent hover:text-accent-foreground'
+                                }`}
                             >
-                              <Clock size={14} className="mr-2 text-gray-400" />
-                              <span className="text-gray-700 dark:text-gray-300">
+                              <Clock size={16} className="mr-3 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
+                              <span className="text-foreground group-hover:text-primary transition-colors duration-200">
                                 {item.query}
                               </span>
                             </button>
@@ -298,36 +307,49 @@ const GlobalSearch = () => {
                       </ul>
                     </div>
                   )}
-                  
-                  {query && !loading && (
-                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                      No se encontraron resultados para "{query}"
+
+                  {query && !loading && results.length === 0 && (
+                    <div className="p-8 text-center text-muted-foreground">
+                      <Search size={36} className="mx-auto mb-4 text-muted-foreground/60" />
+                      <p className="text-lg font-medium mb-2">
+                        No se encontraron resultados para "<span className="text-foreground font-semibold">{query}</span>"
+                      </p>
+                      <p>Intenta con otra palabra clave o verifica la ortografía.</p>
                     </div>
                   )}
-                  
-                  {!query && (
-                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                      Comienza a escribir para buscar en la documentación
+
+                  {!query && recentSearches.length === 0 && (
+                    <div className="p-8 text-center text-muted-foreground">
+                      <Search size={36} className="mx-auto mb-4 text-muted-foreground/60" />
+                      <p className="text-lg font-medium mb-2">
+                        ¿Qué estás buscando?
+                      </p>
+                      <p>
+                        Comienza a escribir para buscar en toda tu documentación.
+                      </p>
+                      <p className="mt-4 text-sm">
+                        Consejo: Usa <kbd className="kbd">⌘K</kbd> o <kbd className="kbd">Ctrl+K</kbd> para abrir la búsqueda en cualquier momento.
+                      </p>
                     </div>
                   )}
                 </div>
               )}
             </div>
-            
-            {/* Pie del modal con atajos de teclado */}
-            <div className="p-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex justify-center space-x-4">
+
+            {/* Modal Footer with Keyboard Shortcuts */}
+            <div className="p-3 border-t border-border text-xs text-muted-foreground flex justify-center space-x-4 sm:space-x-6 bg-secondary/20">
               <div className="flex items-center">
-                <span className="bg-gray-200 dark:bg-gray-700 rounded px-1.5 py-0.5 mr-1.5">↑</span>
-                <span className="bg-gray-200 dark:bg-gray-700 rounded px-1.5 py-0.5 mr-1.5">↓</span>
-                para navegar
+                <kbd className="kbd">↑</kbd>
+                <kbd className="kbd">↓</kbd>
+                <span className="ml-2">para navegar</span>
               </div>
               <div className="flex items-center">
-                <span className="bg-gray-200 dark:bg-gray-700 rounded px-1.5 py-0.5 mr-1.5">Enter</span>
-                para seleccionar
+                <kbd className="kbd">Enter</kbd>
+                <span className="ml-2">para seleccionar</span>
               </div>
               <div className="flex items-center">
-                <span className="bg-gray-200 dark:bg-gray-700 rounded px-1.5 py-0.5 mr-1.5">Esc</span>
-                para cerrar
+                <kbd className="kbd">Esc</kbd>
+                <span className="ml-2">para cerrar</span>
               </div>
             </div>
           </div>

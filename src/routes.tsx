@@ -21,15 +21,27 @@ import ProjectDetailsPage from './pages/projects/ProjectDetailsPage';
 import ProjectMembersPage from './pages/projects/ProjectMembersPage';
 import ProjectSettingsPage from './pages/projects/ProjectSettingsPage';
 
-// Páginas de documentación
-import DocumentNewPage from './pages/documents/DocumentNewPage';
-import DocumentEditPage from './pages/documents/DocumentEditPage';
-import DocumentViewPage from './pages/documents/DocumentViewPage';
-import DocumentVersionsPage from './pages/documents/DocumentVersionsPage';
+// Páginas de pages (nuevo sistema)
+import PageViewPage from './pages/pages/PageViewPage';
+import PageNewPage from './pages/pages/PageNewPage';
+import PageEditPage from './pages/pages/PageEditPage';
 
-// Páginas públicas (simplificadas)
-import PublicDocsPage from './pages/public/PublicDocsPage';
-import PublicDocumentView from './components/public/PublicDocumentView';
+// Páginas de versiones (nuevo)
+import VersionsPage from './pages/versions/VersionsPage';
+import VersionDetailsPage from './pages/versions/VersionDetailsPage';
+import VersionComparePage from './pages/versions/VersionComparePage';
+
+// Páginas de publicación
+import PublicationSettingsPage from './pages/publication/PublicationSettingsPage';
+import SiteSettingsPage from './pages/publication/SiteSettingsPage';
+
+// Páginas públicas actualizadas
+import PublicHomePage from './pages/public/PublicHomePage';
+import PublicProjectPage from './pages/public/PublicProjectPage';
+import PublicPageView from './pages/public/PublicPageView.tsx';
+import PublicVersionPage from './pages/public/PublicVersionPage';
+
+// import DocumentVersionsPage from './pages/documents/DocumentVersionsPage';
 
 // Otros
 import ProfilePage from './pages/profile/ProfilePage';
@@ -39,7 +51,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 const routes: RouteObject[] = [
-  // Rutas de autenticación
+  // =============== RUTAS DE AUTENTICACIÓN ===============
   {
     element: <AuthLayout />,
     children: [
@@ -62,26 +74,47 @@ const routes: RouteObject[] = [
     ]
   },
   
-  // Rutas públicas (SIN autenticación) - Simplificadas
+  // =============== RUTAS PÚBLICAS (SIN AUTENTICACIÓN) ===============
   {
     element: <PublicLayout />,
     children: [
+      // Página principal de documentación
       {
         path: '/docs',
-        element: <PublicDocsPage />
+        element: <PublicHomePage />
+      },
+      
+      // Acceso por token
+      {
+        path: '/public/project/:token',
+        element: <PublicProjectPage />
       },
       {
-        path: '/docs/:documentId',
-        element: <PublicDocumentView />
+        path: '/public/version/:token',
+        element: <PublicVersionPage />
       },
       {
-        path: '/docs/token/:token',
-        element: <PublicDocumentView />
+        path: '/public/page/:token',
+        element: <PublicPageView />
+      },
+      
+      // Rutas de proyectos públicos
+      {
+        path: '/docs/:projectSlug',
+        element: <PublicProjectPage />
+      },
+      {
+        path: '/docs/:projectSlug/:versionNumber',
+        element: <PublicVersionPage />
+      },
+      {
+        path: '/docs/:projectSlug/:versionNumber/*',
+        element: <PublicPageView />
       }
     ]
   },
   
-  // Rutas protegidas (requieren autenticación)
+  // =============== RUTAS PROTEGIDAS PRINCIPALES ===============
   {
     element: <ProtectedRoute><MainLayout /></ProtectedRoute>,
     children: [
@@ -112,15 +145,60 @@ const routes: RouteObject[] = [
     ]
   },
   
-  // Rutas de proyecto (requieren autenticación)
+  // =============== RUTAS DE PROYECTO (NUEVO SISTEMA) ===============
   {
     path: '/projects/:projectId',
     element: <ProtectedRoute><ProjectLayout /></ProtectedRoute>,
     children: [
+      // Dashboard del proyecto
       {
         index: true,
         element: <ProjectDetailsPage />
       },
+      
+      // Gestión de páginas (nuevo sistema)
+      {
+        path: 'pages/new',
+        element: <PageNewPage />
+      },
+      {
+        path: 'pages/:pageId',
+        element: <PageViewPage />
+      },
+      {
+        path: 'pages/:pageId/edit',
+        element: <PageEditPage />
+      },
+      // {
+      //   path: 'categories/:categoryId/pages/new',
+      //   element: <PageNewPage /> // Para compatibilidad temporal
+      // },
+      
+      // Gestión de versiones (nuevo)
+      {
+        path: 'versions',
+        element: <VersionsPage />
+      },
+      {
+        path: 'versions/:versionId',
+        element: <VersionDetailsPage />
+      },
+      {
+        path: 'versions/:versionId/compare/:compareVersionId',
+        element: <VersionComparePage />
+      },
+      
+      // Configuración de publicación
+      {
+        path: 'publication',
+        element: <PublicationSettingsPage />
+      },
+      {
+        path: 'site-settings',
+        element: <SiteSettingsPage />
+      },
+      
+      // Gestión de proyecto
       {
         path: 'members',
         element: <ProjectMembersPage />
@@ -128,36 +206,56 @@ const routes: RouteObject[] = [
       {
         path: 'settings',
         element: <ProjectSettingsPage />
-      },
-      {
-        path: 'documents/new',
-        element: <DocumentNewPage />
-      },
-      {
-        path: 'documents/:documentId',
-        element: <DocumentViewPage />
-      },
-      {
-        path: 'documents/:documentId/edit',
-        element: <DocumentEditPage />
-      },
-      {
-        path: 'documents/:documentId/versions',
-        element: <DocumentVersionsPage />
-      },
-      {
-        path: 'categories/:categoryId/documents/new',
-        element: <DocumentNewPage />
       }
     ]
   },
   
-  // Ruta de 404
+  // // =============== RUTAS LEGACY (COMPATIBILIDAD TEMPORAL) ===============
+  // {
+  //   path: '/projects/:projectId/documents',
+  //   element: <ProtectedRoute><ProjectLayout /></ProtectedRoute>,
+  //   children: [
+  //     // Redirects de documentos a páginas
+  //     {
+  //       path: 'new',
+  //       element: <Navigate to="../pages/new" replace />
+  //     },
+  //     {
+  //       path: ':documentId',
+  //       element: <Navigate to="../pages/:documentId" replace />
+  //     },
+  //     {
+  //       path: ':documentId/edit',
+  //       element: <Navigate to="../pages/:documentId/edit" replace />
+  //     },
+  //     {
+  //       path: ':documentId/versions',
+  //       element: <DocumentVersionsPage /> // Mantener temporalmente
+  //     }
+  //   ]
+  // },
+  
+  // // =============== REDIRECTS PARA COMPATIBILIDAD ===============
+  
+  // // Redirect de categorías a páginas
+  // {
+  //   path: '/projects/:projectId/categories/:categoryId/documents/new',
+  //   element: <Navigate to="/projects/:projectId/pages/new?parentId=:categoryId" replace />
+  // },
+  
+  // // Redirect de documentos individuales
+  // {
+  //   path: '/projects/:projectId/documents/:documentId',
+  //   element: <Navigate to="/projects/:projectId/pages/:documentId" replace />
+  // },
+  
+  // =============== RUTA DE 404 ===============
   {
     path: '*',
     element: <NotFoundPage />
   }
 ];
+
 const router = createHashRouter(routes);
 
 export default router;

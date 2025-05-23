@@ -2,67 +2,153 @@
 @config "../../tailwind.config.js";
 @custom-variant dark (&:where(.dark, .dark *));
 
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Colores base: Fondos claros y texto oscuro con un toque de calidez */
+    --background: 30 100% 99%;
+    /* Un blanco muy suave, casi crema */
+    --foreground: 210 5% 15%;
+    /* Gris oscuro cálido para el texto */
 
+    /* Tarjetas y popovers: Ligeramente diferenciados del fondo */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Blanco puro para contraste */
+    --card-foreground: 210 5% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 210 5% 15%;
 
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    /* Colores primarios: Un tono terracota/ladrillo para acciones principales */
+    --primary: 10 70% 50%;
+    /* Terracota / Ladrillo suave */
+    --primary-foreground: 0 0% 98%;
+    /* Blanco roto para el texto */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Colores secundarios: Un beige arena suave */
+    --secondary: 40 20% 95%;
+    /* Beige muy claro */
+    --secondary-foreground: 210 5% 35%; /* Text on secondary background (dark gray for light theme) */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Colores muted: Para texto y elementos secundarios sutiles */
+    --muted: 30 10% 90%;
+    /* Gris cálido claro */
+    --muted-foreground: 210 5% 45%;
+    /* Gris medio */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Acentos: Un verde oliva sutil o un tono tierra suave */
+    --accent: 70 20% 90%;
+    /* Verde oliva muy claro */
+    --accent-foreground: 210 5% 25%;
+    /* Gris oscuro para el texto */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructivos: Un rojo anaranjado para errores */
+    --destructive: 0 80% 55%;
+    /* Rojo vibrante con un toque anaranjado */
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    /* Bordes y inputs: Tonos tierra sutiles */
+    --border: 30 10% 85%;
+    /* Gris cálido para bordes */
+    --input: 30 10% 85%;
+    /* Gris cálido para inputs */
+    --ring: 10 70% 50%;
+    /* Color primario para el anillo de enfoque */
 
     --radius: 0.5rem;
+
+    /* --- Nuevos colores añadidos para el tema light --- */
+    --link: 210 80% 45%;
+    /* Un azul claro para enlaces */
+    --link-hover: 210 70% 35%;
+
+    --success: 120 60% 40%;
+    /* Un verde agradable para éxito */
+    --success-foreground: 0 0% 98%;
+    /* Texto blanco para éxito */
+
+    --info: 200 70% 50%;
+    /* Un cian/azul para información */
+    --info-foreground: 0 0% 98%;
+    /* Texto blanco para información */
+
+    --warning: 40 90% 50%;
+    /* Un naranja cálido para advertencias */
+    --warning-foreground: 210 5% 15%;
+    /* Texto oscuro para advertencias */
+
+    --border-light: 30 10% 90%;
+    /* Un gris muy claro, más claro que --border */
+    /* --- Fin nuevos colores light --- */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Colores base: Fondos oscuros con toques de calidez */
+    --background: 220 15% 10%;
+    /* Gris muy oscuro, casi negro, con un toque cálido */
+    --foreground: 40 10% 90%;
+    /* Blanco roto cálido para el texto */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Tarjetas y popovers: Más oscuros que el fondo para distinción */
+    --card: 220 15% 12%;
+    /* Gris oscuro ligeramente más claro que el fondo */
+    --card-foreground: 40 10% 90%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 15% 12%;
+    --popover-foreground: 40 10% 90%;
 
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Colores primarios: Un terracota más apagado para no ser demasiado brillante en oscuro */
+    --primary: 10 60% 40%;
+    /* Terracota oscuro */
+    --primary-foreground: 40 10% 98%;
+    /* Blanco casi puro */
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Colores secundarios: Gris topo oscuro */
+    --secondary: 220 10% 20%;
+    /* Gris oscuro */
+    --secondary-foreground: 40 10% 90%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Colores muted: Tonos de gris más claros para elementos sutiles */
+    --muted: 220 10% 25%;
+    /* Gris medio oscuro */
+    --muted-foreground: 40 5% 65%;
+    /* Gris más claro para texto muted */
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Acentos: Un verde bosque oscuro */
+    --accent: 70 15% 25%;
+    /* Verde bosque oscuro */
+    --accent-foreground: 40 10% 90%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructivos: Rojo oscuro para errores */
+    --destructive: 0 70% 40%;
+    /* Rojo oscuro */
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Bordes y inputs: Tonos de gris oscuro */
+    --border: 220 10% 20%;
+    /* Gris oscuro para bordes */
+    --input: 220 10% 20%;
+    /* Gris oscuro para inputs */
+    --ring: 10 60% 40%;
+    /* Color primario oscuro para el anillo de enfoque */
+
+    /* --- Nuevos colores añadidos para el tema dark --- */
+    --link: 210 50% 60%;
+    --link-hover: 210 40% 70%;
+
+    --success: 120 50% 50%;
+    --success-foreground: 40 10% 90%; /* Changed to a light color for better contrast */
+
+    --info: 200 50% 60%;
+    --info-foreground: 40 10% 90%; /* Corrected to a light color for dark theme */
+
+    --warning: 40 70% 60%;
+    --warning-foreground: 210 5% 15%;
+
+    --border-light: 220 10% 25%;
+    /* Un gris ligeramente más claro en dark mode */
   }
 }
 
@@ -70,12 +156,14 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
   }
 }
 
-/* Clases de utilidad personalizadas */
+/* Custom utility classes */
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2;
@@ -88,50 +176,114 @@
   .form-input {
     @apply flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
   }
-}
 
-/* Ejemplo para overlay */
-.yoopta-editor .yoopta-overlay {
-  background-color: rgba(0, 0, 0, 0.6); /* oscuro semitransparente */
-}
+  .card-item {
+    @apply bg-card rounded-lg shadow-sm p-4 border border-border flex items-center;
+  }
 
-/* Botones en modo oscuro */
-.dark .yoopta-editor .yoopta-button {
-  background-color: #2d3748; /* gris oscuro */
-  color: white;
-  border-color: #4a5568;
-}
+  .empty-state {
+    @apply p-6 text-center bg-card rounded-md border border-border;
+  }
 
-.yoopta-toolbar-item {
-  background: transparent !important;
-  &:hover {
-    background: #4a5568 !important;
+  .stats-card {
+    @apply text-center p-4 rounded-lg bg-secondary/10;
+  }
+
+  .border-border-light {
+    @apply border-border/70;
+  }
+
+  /* KBD style for keyboard shortcuts */
+  .kbd {
+    @apply bg-muted text-muted-foreground px-1.5 py-0.5 rounded border border-border inline-flex items-center justify-center;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    /* Ancho del scrollbar vertical */
+    height: 8px;
+    /* Alto del scrollbar horizontal */
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    /* Color del "pulgar" del scrollbar */
+    border-radius: 4px;
+    /* Bordes redondeados del pulgar */
+    border: 2px solid transparent;
+    /* Para que el pulgar no llegue al borde del track */
+    background-clip: padding-box;
+    /* Asegura que el borde transparente se tenga en cuenta */
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background-color: transparent;
+    /* Fondo transparente del track */
   }
 }
 
-.dark {
-  .yoopta-editor .yoopta-button:hover,
-  .yoopta-block-options-item:hover {
-    background-color: #4a5568;
+button {
+  cursor: pointer;
+}
+
+/* Yoopta Editor specific overrides for Notion-like appearance */
+.yoopta-editor {
+  .yoo-overlay {
+    background-color: rgba(0, 0, 0, 0.2);
+    /* Lighter overlay */
   }
 
-  .yoopta-action-menu-list-content, .yoo-action-menu-flex, .yoopta-toolbar-root,
-  .yoopta-block-options-menu-content, .yoopta-link-tool, .yoo-image-flex{
-    background-color: #2d3748; /* gris oscuro */
-    color: white;
-    border-color: #4a5568;
+  /* Toolbar and Action Menu */
+  .yoo-toolbar-root,
+  .yoo-action-menu-list-content,
+  .yoo-link-tool,
+  .yoo-image-flex {
+    @apply bg-card border border-border shadow-md rounded-lg;
+
+    .dark & {
+      @apply bg-card border-border;
+    }
   }
 
-  .yoo-toolbar-z-50 > div{
-    background-color: #2d3748;
+  .yoo-toolbar-item,
+  .yoo-action-menu-list-item,
+  .yoo-block-options-item {
+    @apply text-foreground hover:bg-accent focus:bg-accent;
+
+    .dark & {
+      @apply text-foreground hover:bg-accent focus:bg-accent;
+    }
   }
 
+  .yoo-button {
+    /* General Yoopta buttons */
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md;
 
-  .yoopta-block-action-buttons button, .yoopta-link-tool-input{
-    color: white;
+    .dark & {
+      @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+    }
   }
 
-  .yoo-toolbar-text-gray-600{
-    color: rgb(149, 149, 149);
+  .yoo-toolbar-text-gray-600 {
+    /* Specific text color in toolbar */
+    @apply text-muted-foreground;
+
+    .dark & {
+      @apply text-muted-foreground;
+    }
+  }
+
+  .yoo-link-tool-input {
+    @apply flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Block options button styles */
+  .yoopta-block-action-buttons button {
+    @apply text-muted-foreground hover:bg-muted rounded-md p-1;
+
+    .dark & {
+      @apply text-muted-foreground hover:bg-muted;
+    }
   }
 }

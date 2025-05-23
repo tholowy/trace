@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import type { Project, ProjectMember, Category, ServiceResponse } from '../types';
+import type { Project, ProjectMember, Category, ServiceResponse, Role } from '../types';
+
 
 export const projectService = {
   async getProjects(): Promise<ServiceResponse<Project[]>> {
@@ -11,8 +12,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) { // Explicitly type error as any
+      return { data: null, error: error.message }; // Return error message
     }
   },
 
@@ -26,8 +27,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -41,8 +42,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -57,8 +58,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -71,8 +72,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data: null, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -122,7 +123,7 @@ export const projectService = {
 
   async addProjectMember(
     projectId: string,
-    userId: string,
+    userId: string, // This userId should come from a lookup or actual user registration
     permissionLevel: ProjectMember['permission_level'] = 'viewer'
   ): Promise<ServiceResponse<ProjectMember>> {
     try {
@@ -133,12 +134,37 @@ export const projectService = {
           user_id: userId,
           permission_level: permissionLevel
         })
-        .select();
+        .select(`
+          *,
+          user_profiles (
+            id,
+            first_name,
+            last_name,
+            avatar_url,
+            email
+          )
+        `) // Select to get the full member data with user profile
+        .single();
 
       if (error) throw error;
-      return { data: data[0], error: null };
-    } catch (error) {
-      return { data: null, error };
+
+      // Structure the returned data to match ProjectMember
+      const newMember: ProjectMember = {
+        ...data,
+        user: {
+          id: data.user_profiles.id,
+          email: data.user_profiles.email,
+          profile: {
+            id: data.user_profiles.id,
+            first_name: data.user_profiles.first_name,
+            last_name: data.user_profiles.last_name,
+            avatar_url: data.user_profiles.avatar_url,
+          },
+        },
+      };
+      return { data: newMember, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -150,15 +176,42 @@ export const projectService = {
     try {
       const { data, error } = await supabase
         .from('project_members')
-        .update({ permissionLevel })
+        .update({ permission_level: permissionLevel }) // Corrected column name to 'permission_level'
         .eq('project_id', projectId)
         .eq('user_id', userId)
-        .select();
+        .select(`
+          *,
+          user_profiles (
+            id,
+            first_name,
+            last_name,
+            avatar_url,
+            email
+          )
+        `) // Select to get the updated member data with user profile
+        .single();
 
       if (error) throw error;
-      return { data: data[0], error: null };
-    } catch (error) {
-      return { data: null, error };
+
+      // Structure the returned data to match ProjectMember
+      const updatedMember: ProjectMember = {
+        ...data,
+        user: {
+          id: data.user_profiles.id,
+          email: data.user_profiles.email,
+          profile: {
+            id: data.user_profiles.id,
+            first_name: data.user_profiles.first_name,
+            last_name: data.user_profiles.last_name,
+            avatar_url: data.user_profiles.avatar_url,
+            created_at: '', // Placeholder
+            updated_at: ''  // Placeholder
+          },
+        },
+      };
+      return { data: updatedMember, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -172,8 +225,22 @@ export const projectService = {
 
       if (error) throw error;
       return { data: null, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  },
+
+  async getRoles(): Promise<ServiceResponse<Role[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*')
+        .order('name', { ascending: true }); // Order alphabetically
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -187,8 +254,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -202,8 +269,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -218,8 +285,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
@@ -232,8 +299,8 @@ export const projectService = {
 
       if (error) throw error;
       return { data: null, error: null };
-    } catch (error) {
-      return { data: null, error };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   }
 };
