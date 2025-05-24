@@ -733,5 +733,21 @@ export const publicationService = {
     }
 
     return { isValid: errors.length === 0, errors };
-  }
+  },
+
+  getProjectCurrentVersion: async (projectId: string): Promise<ServiceResponse<ProjectVersion>> => {
+    try {
+      const { data, error } = await supabase
+        .from('project_version_details')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
 };
