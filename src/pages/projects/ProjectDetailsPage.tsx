@@ -15,6 +15,7 @@ const ProjectDetailsPage: FC = () => {
   useEffect(() => {
     if (!projectId) return;
     async function fetchProjectData() {
+      if (typeof projectId !== 'string') return;
       try {
         setLoading(true);
         // Cargar proyecto
@@ -23,7 +24,7 @@ const ProjectDetailsPage: FC = () => {
         setProject(projectData);
 
         // Cargar todas las páginas del proyecto (sin categorías)
-        const { data: pagesData, error: pagesError } = await pageService.getPages(projectId);
+        const { data: pagesData, error: pagesError } = await pageService.getPages(projectId, false);
         if (pagesError) throw pagesError;
         setPages(pagesData || []);
       } catch (err: any) {
@@ -159,8 +160,6 @@ const ProjectDetailsPage: FC = () => {
                     )}
                     <div className="flex items-center text-xs text-muted-foreground">
                       <span>Actualizado: {formatDate(page.updated_at)}</span>
-                      <span className="mx-2">•</span>
-                      <span>Tipo: {page.page_type}</span>
                     </div>
                   </div>
                 </Link>

@@ -271,11 +271,6 @@ const PublicPageView: FC = () => {
                     </div>
                     
                     <div className="flex items-center">
-                      <Clock size={14} className="mr-1" />
-                      <span>Tipo: {page.page_type}</span>
-                    </div>
-                    
-                    <div className="flex items-center">
                       <Eye size={14} className="mr-1" />
                       <span>Página pública</span>
                     </div>

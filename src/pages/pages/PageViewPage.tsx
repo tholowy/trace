@@ -3,7 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { pageService } from '../../services/pageService';
 import {
   Pencil,
-  Clock,
   Calendar,
   ChevronRight,
   Eye,
@@ -14,13 +13,14 @@ import {
   Copy,
   Move,
   Trash2,
-  FileText
+  FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DocumentViewer from '../../components/documents/DocumentViewer';
 import VersionSelector from '../../components/versions/VersionSelector';
 import type { Page, NavigationContext } from '../../types';
+import ChildPagesSection from '../../components/pages/ChildPagesSection';
 
 const PageViewPage: FC = () => {
   const { projectId, pageId } = useParams<{ projectId: string; pageId: string }>();
@@ -142,7 +142,7 @@ const PageViewPage: FC = () => {
 
   if (error) {
     return (
-      <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive-foreground rounded-lg">
+      <div className="p-4 bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400 rounded-lg">
         {error}
       </div>
     );
@@ -196,7 +196,7 @@ const PageViewPage: FC = () => {
       {/* Header de la página */}
       <div className="flex flex-col mb-6">
         <div className="flex items-center justify-between mb-4">
-          {/* Metadata - SIN TIPO DE PÁGINA */}
+          {/* Metadata */}
           <div className="flex items-center text-sm text-muted-foreground space-x-4">
             <div className="flex items-center">
               <Calendar size={16} className="mr-1" />
@@ -206,13 +206,6 @@ const PageViewPage: FC = () => {
               <Pencil size={16} className="mr-1" />
               <span>Por {editorName}</span>
             </div>
-            {/* Información adicional sobre subpáginas */}
-            {page.has_subpage_blocks && (
-              <div className="flex items-center">
-                <FileText size={16} className="mr-1" />
-                <span>Contiene subpáginas</span>
-              </div>
-            )}
           </div>
 
           {/* Acciones */}
@@ -226,7 +219,7 @@ const PageViewPage: FC = () => {
             {/* Botón de historial */}
             <Link
               to={`/projects/${projectId}/versions`}
-              className="btn-secondary flex items-center"
+              className="px-3 py-1.5 rounded-md text-sm font-medium flex items-center transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80"
             >
               <History size={16} className="mr-1.5" />
               Historial
@@ -258,7 +251,7 @@ const PageViewPage: FC = () => {
             {/* Botón de editar */}
             <Link
               to={`/projects/${projectId}/pages/${pageId}/edit`}
-              className="btn-primary flex items-center"
+              className="px-3 py-1.5 rounded-md text-sm font-medium flex items-center transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Pencil size={16} className="mr-1.5" />
               Editar
@@ -268,7 +261,7 @@ const PageViewPage: FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowActionsMenu(!showActionsMenu)}
-                className="btn-ghost p-2"
+                className="p-2 rounded-md hover:bg-accent hover:text-accent-foreground"
               >
                 <MoreHorizontal size={16} />
               </button>
@@ -332,26 +325,18 @@ const PageViewPage: FC = () => {
               </p>
             )}
 
-            {/* Indicadores de estado - SIN TIPO DE PÁGINA */}
+            {/* Indicadores de estado */}
             <div className="flex items-center space-x-2">
               {!page.is_published && (
-                <span className="px-2 py-1 bg-warning/10 text-warning-foreground text-xs rounded-full">
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 text-xs rounded-full">
                   Borrador
                 </span>
               )}
 
-              {/* Nuevo indicador para sistema simplificado */}
               <span className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 text-xs rounded-full flex items-center">
                 <FileText size={12} className="mr-1" />
                 Página
               </span>
-
-              {/* Indicador si tiene subpáginas */}
-              {page.has_subpage_blocks && (
-                <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 text-xs rounded-full">
-                  Con subpáginas
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -364,8 +349,20 @@ const PageViewPage: FC = () => {
         </div>
       )}
 
-      {/* Mostrar páginas hijas SIEMPRE (ya no depende del tipo) */}
-      <ChildPagesSection projectId={projectId!} parentPageId={pageId!} />
+      {/* Sección de Subpáginas */}
+      {projectId && pageId && (
+        <ChildPagesSection
+          projectId={projectId}
+          parentPageId={pageId}
+          onSubpageCreated={() => {
+            setLoading(true);
+            pageService.getPageById(pageId).then(({ data }) => {
+              setPage(data);
+              setLoading(false);
+            });
+          }}
+        />
+      )}
 
       {/* Navegación entre páginas hermanas */}
       {navigationContext && (navigationContext.previous_page || navigationContext.next_page) && (
@@ -374,7 +371,7 @@ const PageViewPage: FC = () => {
             {navigationContext.previous_page ? (
               <Link
                 to={`/projects/${projectId}/pages/${navigationContext.previous_page.id}`}
-                className="flex items-center text-link hover:text-link-hover"
+                className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 <ChevronRight size={16} className="mr-1 rotate-180" />
                 <div>
@@ -387,7 +384,7 @@ const PageViewPage: FC = () => {
             {navigationContext.next_page && (
               <Link
                 to={`/projects/${projectId}/pages/${navigationContext.next_page.id}`}
-                className="flex items-center text-link hover:text-link-hover text-right"
+                className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-right"
               >
                 <div>
                   <div className="text-sm text-muted-foreground">Siguiente</div>
@@ -399,107 +396,6 @@ const PageViewPage: FC = () => {
           </div>
         </div>
       )}
-
-    </div>
-  );
-};
-
-// Componente para mostrar páginas hijas - SIMPLIFICADO
-interface ChildPagesSectionProps {
-  projectId: string;
-  parentPageId: string;
-}
-
-const ChildPagesSection: React.FC<ChildPagesSectionProps> = ({ projectId, parentPageId }) => {
-  const [childPages, setChildPages] = useState<Page[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadChildPages() {
-      try {
-        const { data } = await pageService.getPages(projectId);
-        const children = data?.filter(page => page.parent_page_id === parentPageId) || [];
-        setChildPages(children);
-      } catch (error) {
-        console.error('Error loading child pages:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadChildPages();
-  }, [projectId, parentPageId]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-4 text-muted-foreground">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-        <span className="ml-2">Cargando subpáginas...</span>
-      </div>
-    );
-  }
-
-  if (childPages.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="bg-card rounded-lg shadow-sm p-6 mt-6">
-      <h2 className="text-lg font-semibold text-foreground mb-4">
-        Subpáginas Jerárquicas
-      </h2>
-      
-      <p className="text-sm text-muted-foreground mb-4">
-        Estas son las páginas que tienen esta página como padre en la jerarquía.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {childPages.map(page => (
-          <Link
-            key={page.id}
-            to={`/projects/${projectId}/pages/${page.id}`}
-            className="p-4 border border-border rounded-lg hover:shadow-md hover:border-primary transition-all bg-background"
-          >
-            <div className="flex items-start space-x-3">
-              {page.icon && (
-                <span className="text-lg">{page.icon}</span>
-              )}
-              <div className="flex-grow min-w-0">
-                <h3 className="font-medium text-foreground mb-1 truncate">
-                  {page.title}
-                </h3>
-
-                {page.description && (
-                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                    {page.description}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex items-center">
-                    <FileText size={12} className="mr-1" />
-                    Página
-                  </span>
-
-                  <div className="flex items-center space-x-1">
-                    {!page.is_published && (
-                      <span className="text-xs px-2 py-0.5 bg-warning/10 text-warning-foreground rounded">
-                        Borrador
-                      </span>
-                    )}
-                    
-                    {page.has_subpage_blocks && (
-                      <span className="text-xs px-2 py-0.5 bg-green/10 text-green-foreground rounded">
-                        Con subpáginas
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 };

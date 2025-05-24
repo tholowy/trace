@@ -1,19 +1,15 @@
 import { supabase } from '../lib/supabase';
-import type { 
-  Page, 
-  PageTreeNode, 
-  ServiceResponse, 
-  CreatePageOptions, 
-  MovePageOptions, 
+import type {
+  Page,
+  PageTreeNode,
+  ServiceResponse,
+  CreatePageOptions,
+  MovePageOptions,
   DuplicatePageOptions,
   SearchPagesOptions,
   PageSearchResult,
   NavigationContext,
   BreadcrumbItem,
-  YooptaContent,
-  SubPageDisplayMode,
-  ExtractedSubPageReference,
-  PageReference
 } from '../types';
 
 export const pageService = {
@@ -22,14 +18,17 @@ export const pageService = {
   /**
    * Obtiene todas las páginas de un proyecto en estructura plana
    */
-  async getPages(projectId: string): Promise<ServiceResponse<Page[]>> {
+  async getPages(projectId: string, includeChildren: boolean = true): Promise<ServiceResponse<Page[]>> {
     try {
-      const { data, error } = await supabase
+      const supabaseQuery = supabase
         .from('pages')
         .select('*')
-        .eq('project_id', projectId)
-        .order('parent_page_id', { ascending: true, nullsFirst: true })
-        .order('order_index', { ascending: true });
+        .eq('project_id', projectId);
+
+      if (includeChildren) supabaseQuery.order('parent_page_id', { ascending: true, nullsFirst: true })
+      else supabaseQuery.is('parent_page_id', null);
+      supabaseQuery.order('order_index', { ascending: true });
+      const { data, error } = await supabaseQuery;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -61,156 +60,175 @@ export const pageService = {
   /**
  * Obtiene una página por su ruta completa (slug path)
  */
-async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Page>> {
-  try {
-    // Dividir la ruta en segmentos
-    const segments = path.split('/').filter(Boolean);
-    
-    if (segments.length === 0) {
-      throw new Error('Ruta inválida');
-    }
+  async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Page>> {
+    try {
+      // Dividir la ruta en segmentos
+      const segments = path.split('/').filter(Boolean);
 
-    // Función recursiva para encontrar la página siguiendo la ruta
-    let currentParentId: string | null = null;
-    let currentPage: Page | null = null;
-
-    for (const segment of segments) {
-      let query = supabase
-        .from('pages')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('slug', segment);
-
-      // Usar eq con null o is con null según el caso
-      if (currentParentId === null) {
-        query = query.is('parent_page_id', null);
-      } else {
-        query = query.eq('parent_page_id', currentParentId);
+      if (segments.length === 0) {
+        throw new Error('Ruta inválida');
       }
 
-      const { data, error } = await query.single();
+      // Función recursiva para encontrar la página siguiendo la ruta
+      let currentParentId: string | null = null;
+      let currentPage: Page | null = null;
 
-      if (error) throw error;
-      
-      currentPage = data;
-      currentParentId = data.id;
+      for (const segment of segments) {
+        let query = supabase
+          .from('pages')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('slug', segment);
+
+        // Usar eq con null o is con null según el caso
+        if (currentParentId === null) {
+          query = query.is('parent_page_id', null);
+        } else {
+          query = query.eq('parent_page_id', currentParentId);
+        }
+
+        const { data, error } = await query.single();
+
+        if (error) throw error;
+
+        currentPage = data;
+        currentParentId = data.id;
+      }
+
+      if (!currentPage) {
+        throw new Error('Página no encontrada');
+      }
+
+      return { data: currentPage, error: null };
+    } catch (error) {
+      console.error('Error getting page by path:', error);
+      return { data: null, error };
     }
+  },
 
-    if (!currentPage) {
-      throw new Error('Página no encontrada');
+  /**
+   * Obtiene todas las páginas hijas de una página padre
+   */
+  async getPagesByParentId(parentId: string): Promise<ServiceResponse<Page[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('pages')
+        .select('*')
+        .eq('parent_page_id', parentId)
+        .order('order_index', { ascending: true });
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+      console.error('Error getting pages by parent ID:', error);
+      return { data: null, error };
     }
-
-    return { data: currentPage, error: null };
-  } catch (error) {
-    console.error('Error getting page by path:', error);
-    return { data: null, error };
-  }
-},
+  },
 
   /**
    * Crea una nueva página
    */
   async createPage(options: CreatePageOptions & { project_id: string }): Promise<ServiceResponse<Page>> {
-  try {
-    // Generar slug si no se proporciona
-    if (!options.slug) {
-      options.slug = this.generateSlug(options.title);
-    }
+    try {
+      // Generar slug si no se proporciona
+      if (!options.slug) {
+        options.slug = this.generateSlug(options.title);
+      }
 
-    // Verificar que el slug sea único en el contexto del padre
-    let query = supabase
-      .from('pages')
-      .select('id')
-      .eq('project_id', options.project_id)
-      .eq('slug', options.slug);
+      // Verificar que el slug sea único en el contexto del padre
+      let query = supabase
+        .from('pages')
+        .select('id')
+        .eq('project_id', options.project_id)
+        .eq('slug', options.slug);
 
-    // Manejar parent_page_id null correctamente
-    if (options.parent_page_id === null || options.parent_page_id === undefined) {
-      query = query.is('parent_page_id', null);
-    } else {
-      query = query.eq('parent_page_id', options.parent_page_id);
-    }
+      // Manejar parent_page_id null correctamente
+      if (options.parent_page_id === null || options.parent_page_id === undefined) {
+        query = query.is('parent_page_id', null);
+      } else {
+        query = query.eq('parent_page_id', options.parent_page_id);
+      }
 
-    const { data: existingPages } = await query;
+      const { data: existingPages } = await query;
 
-    if (existingPages && existingPages.length > 0) {
-      // Generar slug único añadiendo sufijo
-      let counter = 1;
-      const baseName = options.slug.split('-')[0];
-      let uniqueSlug = `${baseName}-${counter}`;
-      
-      while (true) {
-        let duplicateQuery = supabase
+      if (existingPages && existingPages.length > 0) {
+        // Generar slug único añadiendo sufijo
+        let counter = 1;
+        const baseName = options.slug.split('-')[0];
+        let uniqueSlug = `${baseName}-${counter}`;
+
+        while (true) {
+          let duplicateQuery = supabase
+            .from('pages')
+            .select('id')
+            .eq('project_id', options.project_id)
+            .eq('slug', uniqueSlug);
+
+          if (options.parent_page_id === null || options.parent_page_id === undefined) {
+            duplicateQuery = duplicateQuery.is('parent_page_id', null);
+          } else {
+            duplicateQuery = duplicateQuery.eq('parent_page_id', options.parent_page_id);
+          }
+
+          const { data: duplicate } = await duplicateQuery;
+
+          if (!duplicate || duplicate.length === 0) {
+            options.slug = uniqueSlug;
+            break;
+          }
+
+          counter++;
+          uniqueSlug = `${baseName}-${counter}`;
+        }
+      }
+
+      // Obtener el order_index si no se proporciona
+      if (options.order_index === undefined) {
+        let orderQuery = supabase
           .from('pages')
-          .select('id')
+          .select('order_index')
           .eq('project_id', options.project_id)
-          .eq('slug', uniqueSlug);
+          .order('order_index', { ascending: false })
+          .limit(1);
 
         if (options.parent_page_id === null || options.parent_page_id === undefined) {
-          duplicateQuery = duplicateQuery.is('parent_page_id', null);
+          orderQuery = orderQuery.is('parent_page_id', null);
         } else {
-          duplicateQuery = duplicateQuery.eq('parent_page_id', options.parent_page_id);
+          orderQuery = orderQuery.eq('parent_page_id', options.parent_page_id);
         }
 
-        const { data: duplicate } = await duplicateQuery;
-
-        if (!duplicate || duplicate.length === 0) {
-          options.slug = uniqueSlug;
-          break;
-        }
-        
-        counter++;
-        uniqueSlug = `${baseName}-${counter}`;
+        const { data: lastPages } = await orderQuery;
+        options.order_index = (lastPages && lastPages[0]?.order_index || 0) + 1;
       }
-    }
 
-    // Obtener el order_index si no se proporciona
-    if (options.order_index === undefined) {
-      let orderQuery = supabase
+      // Obtener usuario actual
+      const { data: user } = await supabase.auth.getUser();
+
+      const { data, error } = await supabase
         .from('pages')
-        .select('order_index')
-        .eq('project_id', options.project_id)
-        .order('order_index', { ascending: false })
-        .limit(1);
+        .insert({
+          project_id: options.project_id,
+          parent_page_id: options.parent_page_id || null, // Asegurar que sea null, no undefined
+          title: options.title,
+          slug: options.slug,
+          content: options.content || null,
+          description: options.description || null,
+          icon: options.icon || null,
+          is_published: options.is_published || false,
+          order_index: options.order_index,
+          created_by: user.user?.id,
+          updated_by: user.user?.id,
+        })
+        .select()
+        .single();
 
-      if (options.parent_page_id === null || options.parent_page_id === undefined) {
-        orderQuery = orderQuery.is('parent_page_id', null);
-      } else {
-        orderQuery = orderQuery.eq('parent_page_id', options.parent_page_id);
-      }
-
-      const { data: lastPages } = await orderQuery;
-      options.order_index = (lastPages && lastPages[0]?.order_index || 0) + 1;
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error creating page:', error);
+      return { data: null, error };
     }
-
-    // Obtener usuario actual
-    const { data: user } = await supabase.auth.getUser();
-
-    const { data, error } = await supabase
-      .from('pages')
-      .insert({
-        project_id: options.project_id,
-        parent_page_id: options.parent_page_id || null, // Asegurar que sea null, no undefined
-        title: options.title,
-        slug: options.slug,
-        content: options.content || null,
-        description: options.description || null,
-        icon: options.icon || null,
-        is_published: options.is_published || false,
-        order_index: options.order_index,
-        created_by: user.user?.id,
-        updated_by: user.user?.id,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error creating page:', error);
-    return { data: null, error };
-  }
-},
+  },
 
   /**
    * Actualiza una página existente
@@ -231,7 +249,7 @@ async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Pa
       };
 
       // Remover campos undefined
-      Object.keys(allowedUpdates).forEach(key => 
+      Object.keys(allowedUpdates).forEach(key =>
         allowedUpdates[key] === undefined && delete allowedUpdates[key]
       );
 
@@ -333,12 +351,17 @@ async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Pa
       const breadcrumbs = await this.generateBreadcrumbs(pageId);
 
       // Obtener páginas hermanas
-      const { data: siblings } = await supabase
+      let supabaseQuery = supabase
         .from('pages')
         .select('*')
         .eq('project_id', currentPage.project_id)
-        .is('parent_page_id', currentPage.parent_page_id)
-        .order('order_index');
+
+      if (currentPage.parent_page_id) supabaseQuery = supabaseQuery.eq('parent_page_id', currentPage.parent_page_id);
+
+      const { data: siblings } = await supabaseQuery
+        .order('order_index', { ascending: true });
+
+
 
       // Encontrar página anterior y siguiente
       const currentIndex = siblings?.findIndex(p => p.id === pageId) || 0;
@@ -644,7 +667,7 @@ async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Pa
    */
   hasSubPageBlocks(content: YooptaContent | null): boolean {
     if (!content?.blocks) return false;
-    
+
     return Object.values(content.blocks).some(block => block.type === 'sub-page');
   },
 
@@ -653,7 +676,7 @@ async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Pa
    */
   extractSubPageReferences(content: YooptaContent | null): ExtractedSubPageReference[] {
     if (!content?.blocks) return [];
-    
+
     return Object.entries(content.blocks)
       .filter(([_, block]) => block.type === 'sub-page')
       .map(([blockId, block]) => ({
@@ -672,21 +695,21 @@ async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Pa
   async checkCircularReference(pageId: string, newParentId: string): Promise<boolean> {
     try {
       let currentId: string | null = newParentId;
-      
+
       while (currentId) {
         if (currentId === pageId) {
           return true; // Referencia circular detectada
         }
-        
+
         const { data: parent } = await supabase
           .from('pages')
           .select('parent_page_id')
           .eq('id', currentId)
           .single();
-        
+
         currentId = parent?.parent_page_id || null;
       }
-      
+
       return false;
     } catch (error) {
       console.error('Error checking circular reference:', error);
@@ -779,7 +802,7 @@ async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Pa
 
       // Combinar y eliminar duplicados
       const relatedPages: Page[] = [];
-      
+
       linkedPages?.forEach(link => {
         if (link.target_page) {
           relatedPages.push(link.target_page);

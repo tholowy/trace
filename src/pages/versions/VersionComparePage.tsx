@@ -588,9 +588,6 @@ const PageChangesList: React.FC<PageChangesListProps> = ({
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
                       <div><strong>ID:</strong> {pageId}</div>
-                      {page.page && (
-                        <div><strong>Tipo:</strong> {page.page.page_type}</div>
-                      )}
                       {changeType === 'modified' && page.version1 && page.version2 && (
                         <div className="mt-4">
                           <h5 className="font-medium text-gray-800 dark:text-white mb-2">

@@ -36,7 +36,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { Document } from '../../types';
 import { Save, Clock, Check } from 'lucide-react';
-import SubPagePlugin from './plugins/SubPagePlugin';
+// import SubPagePlugin from './plugins/SubPagePlugin';
 
 // Configuración de Mermaid
 mermaid.initialize({
@@ -95,7 +95,7 @@ const DocumentEditor: FC<DocumentEditorProps> = ({
     MermaidPlugin,
     Table,
     Image,
-    SubPagePlugin // Plugin simplificado sin callbacks adicionales
+    // SubPagePlugin // Plugin simplificado sin callbacks adicionales
   ], []);
 
   // Crear el editor con los plugins

@@ -1,22 +1,22 @@
-import { YooptaPlugin, useYooptaEditor, useBlockData } from '@yoopta/editor';
+import { YooptaPlugin, useYooptaEditor } from '@yoopta/editor';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  FileText, 
-  Trash2,
-  ExternalLink
-} from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { pageService } from '../../../services/pageService';
-import type { 
-  Page, 
-  ServiceResponse
-} from '../../../types';
+import type { Page } from '../../../types';
+
+// A simple utility to generate a unique ID for inner elements (if needed)
+const generateShortId = () => {
+  return Math.random().toString(36).substring(2, 9);
+};
 
 // =============== INTERFACES ===============
 
 interface SubPageElement {
+  id: string; // Add id to the interface as it's directly from element.id
   pageId?: string;
   title?: string;
+  isNew?: boolean; // Keep this if you use it for internal logic
 }
 
 interface SubPageProps {
@@ -28,146 +28,160 @@ interface SubPageProps {
 
 // =============== COMPONENTE PRINCIPAL ===============
 
-const SubPageComponent: React.FC<SubPageProps> = ({ 
-  attributes, 
-  children, 
-  element, 
+const SubPageComponent: React.FC<SubPageProps> = ({
+  attributes,
+  children,
+  element,
   readOnly = false
 }) => {
+  console.log('SubPageComponent attributes:', attributes);
+  console.log('SubPageComponent element:', element); // This should now show the ID
+
   const editor = useYooptaEditor();
-  const blockData = useBlockData(attributes?.['data-yoopta-block-id']);
-  
+
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Usar ref para evitar doble ejecución en modo desarrollo
-  const hasCreatedRef = useRef(false);
+
+  // Initialize state directly from element props. This is crucial.
+  const [displayTitle, setDisplayTitle] = useState<string | undefined>(element.title);
+
+  // This ref is still useful to prevent multiple rapid backend calls if the
+  // `createAndReplaceSubPageAutomatically` runs multiple times before the
+  // `element.pageId` is updated by Yoopta.
+  const hasPageCreationStartedRef = useRef(false);
+
   const navigate = useNavigate();
+  const { projectId, pageId: currentPageId } = useParams<{ projectId: string; pageId: string }>();
 
-  const { projectId, pageId } = useParams<{ projectId: string; pageId: string }>();
-
-  // Función para crear nueva subpágina automáticamente
-  const createSubPageAutomatically = useCallback(async () => {
-    if (!projectId || !editor || hasCreatedRef.current) {
+  // Function to create new subpage automatically and replace the block
+  const createAndReplaceSubPageAutomatically = useCallback(async () => {
+    // Only proceed if element.pageId is explicitly missing, we have project ID and editor
+    // AND page creation hasn't already started for this component instance.
+    if (element.pageId || !projectId || !editor || hasPageCreationStartedRef.current) {
       return;
     }
 
-    hasCreatedRef.current = true;
+    hasPageCreationStartedRef.current = true; // Mark that page creation process has started
     setError(null);
-    
+    setLoading(true); // Show loading state
+
     try {
-      console.log('Creando subpágina automáticamente...');
-      
+      console.log('Creando subpágina automáticamente en el backend...');
+
       const result = await pageService.createPage({
         project_id: projectId,
-        parent_page_id: pageId,
+        parent_page_id: currentPageId,
         title: 'Nueva página',
         is_published: false
       });
 
       if (result.data) {
-        console.log('Subpágina creada:', result.data);
-        
-        // Actualizar el bloque actual con el pageId de la nueva página
-        const blockId = attributes?.['data-yoopta-block-id'];
-        if (blockId) {
-          editor.updateBlock(blockId, {
-            type: 'SubPage',
+        console.log('Subpágina creada en el backend:', result.data);
+
+        // The ID of the current, existing block from the element prop
+        const currentBlockId = element.id; 
+        console.log('ID del bloque actual (element.id):', currentBlockId);
+
+        if (currentBlockId) {
+          // Define the content for the new block, using the same ID
+          const newBlockContent = {
+            id: currentBlockId, // Use the existing block ID
+            type: 'SubPage', // This is the block type defined in your plugin
             value: [
               {
-                id: 'subpage',
-                type: 'sub-page',
+                id: 'subpage-element-' + generateShortId(), // Unique ID for the inner element
+                type: 'sub-page', // This is the element type
                 children: [{ text: '' }],
                 props: {
                   pageId: result.data.id,
                   title: result.data.title,
-                  isNew: false
+                  isNew: false // Now it's not "new" in terms of needing a backend page
                 }
               }
             ]
-          });
+          };
+
+          console.log('Reemplazando bloque existente con ID:', currentBlockId, 'con nuevo contenido:', newBlockContent);
+          // Use editor.updateBlock if replaceBlock is causing issues, but replaceBlock is safer here.
+          // If you reverted to updateBlock, stick with updateBlock. If you were using replaceBlock, continue.
+          editor.updateBlock(currentBlockId, newBlockContent); 
+
+          // Update local state to reflect the new page data immediately
+          setDisplayTitle(result.data.title);
+          setPage(result.data); // Update the fetched page state
+          console.log('Subpágina creada y bloque actualizado/reemplazado en el editor.');
+        } else {
+            console.error('Error: element.id no está disponible. El bloque no se actualizará en el editor.');
         }
-        
-        // Navegar a la nueva página después de un pequeño delay para que se guarde
-        // setTimeout(() => {
-        //   const newPageUrl = `/projects/${projectId}/pages/${result.data?.id}/edit`;
-        //   navigate(newPageUrl);
-        // }, 300);
+
       } else {
-        throw new Error('No se pudo crear la página');
+        throw new Error('No se pudo crear la página en el backend.');
       }
     } catch (error: any) {
       console.error('Error al crear la subpágina:', error);
       setError(error.message || 'Error al crear la subpágina');
-      hasCreatedRef.current = false; // Resetear para permitir retry
+      hasPageCreationStartedRef.current = false; // Allow retry if an error occurred
+    } finally {
+      setLoading(false); // Hide loading state
     }
-  }, [projectId, pageId, navigate, editor, attributes]);
+  }, [projectId, currentPageId, editor, element.id, element.pageId]); // Depend on element.id and element.pageId
 
-  // Crear automáticamente cuando es un bloque nuevo sin pageId
+  // Effect to trigger automatic creation ONLY if element.pageId is explicitly empty
   useEffect(() => {
-    if (!element.pageId && !hasCreatedRef.current) {
-      createSubPageAutomatically();
+    // Only trigger if element.pageId is undefined or an empty string,
+    // and we haven't already initiated the creation process for this component instance.
+    if (!element.pageId && !hasPageCreationStartedRef.current) {
+      createAndReplaceSubPageAutomatically();
     }
-  }, [element.pageId, createSubPageAutomatically]);
+  }, [element.pageId, createAndReplaceSubPageAutomatically]);
 
-  // Cargar información de la página si existe
+
+  // Effect to load page information if pageId exists (either initially or after creation)
   useEffect(() => {
     const loadPage = async () => {
+      // Use element.pageId for fetching, as this is the canonical source from Yoopta.
       if (!element.pageId) return;
-      
+
+      // If we already have the page data in 'page' state and it matches element.pageId, no need to fetch again
+      if (page && page.id === element.pageId) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
+      setError(null);
       try {
         const result = await pageService.getPageById(element.pageId);
         if (result.data) {
           setPage(result.data);
+          setDisplayTitle(result.data.title);
+        } else {
+          setError('Página no encontrada o eliminada.');
         }
       } catch (error) {
-        console.error('Error loading page:', error);
-        setError('Error al cargar la página');
+        console.error('Error al cargar la página:', error);
+        setError('Error al cargar la página.');
       } finally {
         setLoading(false);
       }
     };
 
     loadPage();
-  }, [element.pageId]);
-
+  }, [element.pageId, page]); // Depend on element.pageId (the source of truth from Yoopta) and local 'page' state
 
   // Navegar a la página existente
   const handleNavigateToPage = useCallback(() => {
+    // Use element.pageId for navigation as it's the most reliable source.
     if (element.pageId && projectId) {
       navigate(`/projects/${projectId}/pages/${element.pageId}/edit`);
     }
   }, [element.pageId, projectId, navigate]);
 
-  // Manejar eliminación del bloque
-  const handleRemove = useCallback(async () => {
-    if (element.pageId && page) {
-      // Preguntar si también quiere eliminar la página
-      const deleteSubPage = window.confirm(
-        `¿También quieres eliminar la página "${page.title}"?\n\n` +
-        'Selecciona "Aceptar" para eliminar la página completamente, o "Cancelar" para solo quitar la referencia.'
-      );
+  // --- Render Logic ---
 
-      if (deleteSubPage) {
-        try {
-          await pageService.deletePage(element.pageId);
-        } catch (error) {
-          console.error('Error al eliminar la página:', error);
-        }
-      }
-    }
-
-    // Eliminar el bloque del editor
-    const blockId = attributes?.['data-yoopta-block-id'];
-    if (blockId && editor) {
-      editor.deleteBlock(blockId);
-    }
-  }, [editor, element, page, attributes]);
-
-  // Si no hay pageId y no hay error, está creando la página
-  if (!element.pageId && !error) {
+  // If element.pageId is missing (new block) and we are loading or have no error yet, show creating message
+  if (!element.pageId && loading && !error) {
     return (
       <div {...attributes} className="border border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-4 my-4 bg-blue-50 dark:bg-blue-900/20 animate-pulse">
         <div className="flex items-center space-x-3">
@@ -179,7 +193,7 @@ const SubPageComponent: React.FC<SubPageProps> = ({
     );
   }
 
-  // Si hay error
+  // If there's an error
   if (error) {
     return (
       <div {...attributes} className="border border-dashed border-red-300 dark:border-red-600 rounded-lg p-4 my-4 bg-red-50 dark:bg-red-900/20">
@@ -191,11 +205,12 @@ const SubPageComponent: React.FC<SubPageProps> = ({
               <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => {
-              hasCreatedRef.current = false;
+              // Reset the ref to allow re-attempt
+              hasPageCreationStartedRef.current = false;
               setError(null);
-              createSubPageAutomatically();
+              createAndReplaceSubPageAutomatically();
             }}
             className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
           >
@@ -207,12 +222,13 @@ const SubPageComponent: React.FC<SubPageProps> = ({
     );
   }
 
-  const pageTitle = element.title || page?.title || 'Cargando...';
+  // Use element.title if available, otherwise displayTitle or fallback
+  const finalPageTitle = element.title || displayTitle || page?.title || 'Cargando...';
 
   return (
-    <div 
-      {...attributes} 
-      className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 my-2 bg-white dark:bg-gray-800 hover:shadow-sm transition-all duration-200 cursor-pointer" 
+    <div
+      {...attributes}
+      className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 my-2 bg-white dark:bg-gray-800 hover:shadow-sm transition-all duration-200 cursor-pointer"
       onClick={handleNavigateToPage}
     >
       <div className="flex items-center justify-between">
@@ -220,11 +236,11 @@ const SubPageComponent: React.FC<SubPageProps> = ({
           <div className="flex-shrink-0">
             <FileText size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
-          
+
           <div className="flex-grow min-w-0">
             <div className="flex items-center space-x-2">
               <h4 className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate">
-                {pageTitle}
+                {finalPageTitle}
               </h4>
               {loading && (
                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
@@ -232,27 +248,6 @@ const SubPageComponent: React.FC<SubPageProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Acciones */}
-        {!readOnly && (
-          <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={handleNavigateToPage}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Abrir página"
-            >
-              <ExternalLink size={12} />
-            </button>
-            
-            <button
-              onClick={handleRemove}
-              className="p-1 hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded transition-colors"
-              title="Eliminar"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-        )}
       </div>
       {children}
     </div>
@@ -296,7 +291,6 @@ const BaseSubPagePlugin = new YooptaPlugin({
   },
 });
 
-// Extender el plugin con opciones personalizadas
 export const SubPagePlugin = BaseSubPagePlugin.extend({
   options: {
     HTMLAttributes: {

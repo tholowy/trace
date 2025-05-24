@@ -415,23 +415,6 @@ const PageEditor: FC<PageEditorProps> = ({
             />
           </div>
 
-          {/* Información sobre el sistema simplificado */}
-          <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div className="flex items-start space-x-3">
-              <FileText size={20} className="text-blue-600 dark:text-blue-400 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
-                  💡 Sistema de Subpáginas Integrado
-                </h4>
-                <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                  <p>• Escribe <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">/subpage</code> o <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">/pagina</code> para agregar una referencia a otra página</p>
-                  <p>• Las subpáginas aparecen como bloques dentro del contenido</p>
-                  <p>• Puedes elegir entre 3 modos: <strong>Enlace</strong>, <strong>Vista previa</strong> o <strong>Embebido</strong></p>
-                  <p>• El orden se controla arrastrando los bloques en el editor</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
     </div>
