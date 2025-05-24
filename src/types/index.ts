@@ -154,6 +154,8 @@ export interface PageVersion {
     title: string;
     slug: string;
     project_id: string;
+    parent_page_id: string;
+    order_index: number;
   };
 }
 

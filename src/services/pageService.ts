@@ -39,6 +39,27 @@ export const pageService = {
   },
 
   /**
+   * Obtiene páginas publicadas de un proyecto
+   */
+  async getPublishedPages(projectId: string): Promise<ServiceResponse<Page[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('pages')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('is_published', true)
+        .order('parent_page_id', { ascending: true, nullsFirst: true })
+        .order('order_index', { ascending: true });
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('Error getting published pages:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
    * Obtiene una página por ID con toda su información relacionada
    */
   async getPageById(id: string): Promise<ServiceResponse<Page>> {
@@ -58,8 +79,8 @@ export const pageService = {
   },
 
   /**
- * Obtiene una página por su ruta completa (slug path)
- */
+   * Obtiene una página por su ruta completa (slug path)
+   */
   async getPageByPath(projectId: string, path: string): Promise<ServiceResponse<Page>> {
     try {
       // Dividir la ruta en segmentos
@@ -238,7 +259,7 @@ export const pageService = {
       const { data: user } = await supabase.auth.getUser();
 
       // Filtrar campos que pueden ser actualizados
-      const allowedUpdates = {
+      const allowedUpdates: any = {
         title: updates.title,
         content: updates.content,
         description: updates.description,
@@ -361,8 +382,6 @@ export const pageService = {
 
       const { data: siblings } = await supabaseQuery
         .order('order_index', { ascending: true });
-
-
 
       // Encontrar página anterior y siguiente
       const currentIndex = siblings?.findIndex(p => p.id === pageId) || 0;
@@ -524,7 +543,7 @@ export const pageService = {
     try {
       let query = supabase
         .from('pages')
-        .select('id, title, description, project_id, updated_at')
+        .select('id, title, description, project_id, updated_at, slug, parent_page_id')
         .ilike('title', `%${options.query}%`);
 
       if (options.project_id) {
@@ -546,43 +565,28 @@ export const pageService = {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Convertir a PageSearchResult
-      const searchResults: PageSearchResult[] = (data || []).map(page => ({
-        id: page.id,
-        title: page.title,
-        description: page.description,
-        project_id: page.project_id,
-        project_name: '', // Se podría obtener con JOIN si es necesario
-        updated_at: page.updated_at,
-        rank: 1, // Implementar ranking si es necesario
-        path: '', // Se podría calcular si es necesario
-        has_content: !!page.content
-      }));
+      // Convertir a PageSearchResult y generar rutas
+      const searchResults: PageSearchResult[] = [];
+      
+      for (const page of data || []) {
+        const pathResult = await this.generatePagePath(page.id);
+        
+        searchResults.push({
+          id: page.id,
+          title: page.title,
+          description: page.description,
+          project_id: page.project_id,
+          project_name: '', // Se podría obtener con JOIN si es necesario
+          updated_at: page.updated_at,
+          rank: 1, // Implementar ranking si es necesario
+          path: pathResult.data || `/${page.slug}`,
+          has_content: true // Se podría verificar si tiene contenido
+        });
+      }
 
       return { data: searchResults, error: null };
     } catch (error) {
       console.error('Error searching pages:', error);
-      return { data: null, error };
-    }
-  },
-
-  /**
-   * Obtiene páginas publicadas de un proyecto
-   */
-  async getPublishedPages(projectId: string): Promise<ServiceResponse<Page[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('pages')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('is_published', true)
-        .order('parent_page_id', { ascending: true, nullsFirst: true })
-        .order('order_index', { ascending: true });
-
-      if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('Error getting published pages:', error);
       return { data: null, error };
     }
   },
@@ -666,7 +670,7 @@ export const pageService = {
   /**
    * Verifica si una página tiene bloques de subpáginas en su contenido
    */
-  hasSubPageBlocks(content: YooptaContent | null): boolean {
+  hasSubPageBlocks(content: any | null): boolean {
     if (!content?.blocks) return false;
 
     return Object.values(content.blocks).some(block => block.type === 'sub-page');
@@ -675,17 +679,17 @@ export const pageService = {
   /**
    * Extrae referencias a subpáginas del contenido
    */
-  extractSubPageReferences(content: YooptaContent | null): ExtractedSubPageReference[] {
+  extractSubPageReferences(content: any | null): any[] {
     if (!content?.blocks) return [];
 
     return Object.entries(content.blocks)
-      .filter(([_, block]) => block.type === 'sub-page')
-      .map(([blockId, block]) => ({
+      .filter(([_, block]:any) => block.type === 'sub-page')
+      .map(([blockId, block]:any) => ({
         block_id: blockId,
-        page_id: block.data.page_id,
-        title: block.data.title,
-        display_mode: block.data.display_mode,
-        order: block.data.order || 0
+        page_id: block.data?.page_id || '',
+        title: block.data?.title || '',
+        display_mode: block.data?.display_mode || 'link',
+        order: block.data?.order || 0
       }))
       .sort((a, b) => a.order - b.order);
   },
@@ -804,13 +808,13 @@ export const pageService = {
       // Combinar y eliminar duplicados
       const relatedPages: Page[] = [];
 
-      linkedPages?.forEach(link => {
+      linkedPages?.forEach((link: any) => {
         if (link.target_page) {
           relatedPages.push(link.target_page);
         }
       });
 
-      backlinks?.forEach(link => {
+      backlinks?.forEach((link: any) => {
         if (link.source_page && !relatedPages.find(p => p.id === link.source_page.id)) {
           relatedPages.push(link.source_page);
         }

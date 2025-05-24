@@ -36,6 +36,26 @@ export const versionService = {
   },
 
   /**
+   * Obtiene versiones públicas de un proyecto (solo no archivadas y publicadas)
+   */
+  async getPublicProjectVersions(projectId: string): Promise<ServiceResponse<ProjectVersion[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('project_version_details')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('is_archived', false)
+        .eq('is_draft', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  /**
    * Obtiene una versión específica por ID
    */
   async getVersionById(versionId: string): Promise<ServiceResponse<ProjectVersion>> {
@@ -222,14 +242,114 @@ export const versionService = {
             title,
             slug,
             parent_page_id,
-            page_type,
-            order_index
+            order_index,
+            is_published
           )
         `)
         .eq('project_version_id', versionId);
 
       if (error) throw error;
       return { data: data || [], error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Obtiene solo las páginas publicadas de una versión específica
+   */
+  async getPublishedVersionPages(versionId: string): Promise<ServiceResponse<PageVersion[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('page_versions')
+        .select(`
+          *,
+          page:pages!inner (
+            id,
+            title,
+            slug,
+            parent_page_id,
+            order_index,
+            is_published
+          )
+        `)
+        .eq('project_version_id', versionId)
+        .eq('page.is_published', true);
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Obtiene el árbol de páginas publicadas de una versión
+   */
+  async getPublishedVersionPageTree(versionId: string): Promise<ServiceResponse<any[]>> {
+    try {
+      // Obtener páginas publicadas de la versión
+      const { data: versionPages, error } = await this.getPublishedVersionPages(versionId);
+      if (error) throw error;
+
+      // Construir árbol jerárquico usando los snapshots
+      const pageMap = new Map();
+      const rootPages: any[] = [];
+
+      // Crear mapa de páginas usando los snapshots
+      (versionPages || []).forEach(versionPage => {
+        const node = {
+          id: versionPage.page_id,
+          title: versionPage.title_snapshot || versionPage.page?.title || 'Sin título',
+          slug: versionPage.page?.slug || '',
+          parent_id: versionPage.page?.parent_page_id,
+          order_index: versionPage.page?.order_index || 0,
+          level: 0,
+          path: '',
+          children: [],
+          version_data: versionPage
+        };
+        pageMap.set(versionPage.page_id, node);
+      });
+
+      // Construir jerarquía
+      pageMap.forEach(node => {
+        if (node.parent_id) {
+          const parent = pageMap.get(node.parent_id);
+          if (parent) {
+            node.level = parent.level + 1;
+            parent.children.push(node);
+          }
+        } else {
+          rootPages.push(node);
+        }
+      });
+
+      // Ordenar por order_index
+      const sortNodes = (nodes: any[]) => {
+        nodes.sort((a, b) => a.order_index - b.order_index);
+        nodes.forEach(node => {
+          if (node.children.length > 0) {
+            sortNodes(node.children);
+          }
+        });
+      };
+
+      sortNodes(rootPages);
+
+      // Calcular rutas
+      const calculatePaths = (nodes: any[], basePath = '') => {
+        nodes.forEach(node => {
+          node.path = basePath ? `${basePath}/${node.slug}` : `/${node.slug}`;
+          if (node.children.length > 0) {
+            calculatePaths(node.children, node.path);
+          }
+        });
+      };
+
+      calculatePaths(rootPages);
+
+      return { data: rootPages, error: null };
     } catch (error) {
       return { data: null, error };
     }
@@ -249,9 +369,9 @@ export const versionService = {
             title,
             slug,
             parent_page_id,
-            page_type,
             order_index,
-            project_id
+            project_id,
+            is_published
           )
         `)
         .eq('project_version_id', versionId)
@@ -260,6 +380,68 @@ export const versionService = {
 
       if (error) throw error;
       return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Obtiene una página publicada en una versión específica
+   */
+  async getPublishedPageInVersion(versionId: string, pageId: string): Promise<ServiceResponse<PageVersion>> {
+    try {
+      const { data, error } = await supabase
+        .from('page_versions')
+        .select(`
+          *,
+          page:pages!inner (
+            id,
+            title,
+            slug,
+            parent_page_id,
+            order_index,
+            project_id,
+            is_published
+          )
+        `)
+        .eq('project_version_id', versionId)
+        .eq('page_id', pageId)
+        .eq('page.is_published', true)
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Busca páginas publicadas en una versión específica
+   */
+  async searchPublishedVersionPages(versionId: string, searchTerm: string, limit = 10): Promise<ServiceResponse<PageVersion[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('page_versions')
+        .select(`
+          *,
+          page:pages!inner (
+            id,
+            title,
+            slug,
+            parent_page_id,
+            order_index,
+            project_id,
+            is_published
+          )
+        `)
+        .eq('project_version_id', versionId)
+        .eq('page.is_published', true)
+        .or(`title_snapshot.ilike.%${searchTerm}%,description_snapshot.ilike.%${searchTerm}%`)
+        .limit(limit);
+
+      if (error) throw error;
+      return { data: data || [], error: null };
     } catch (error) {
       return { data: null, error };
     }
@@ -490,11 +672,7 @@ export const versionService = {
       // Obtener conteos básicos
       const [pagesResult, publishedResult, viewsResult, versionData] = await Promise.all([
         supabase.from('page_versions').select('id', { count: 'exact' }).eq('project_version_id', versionId),
-        supabase.from('page_versions').select('page_id').eq('project_version_id', versionId).then(async ({ data }) => {
-          if (!data) return { count: 0 };
-          const pageIds = data.map(p => p.page_id);
-          return supabase.from('pages').select('id', { count: 'exact' }).in('id', pageIds).eq('is_published', true);
-        }),
+        this.getPublishedVersionPages(versionId).then(result => ({ count: result.data?.length || 0 })),
         supabase.from('page_views').select('id', { count: 'exact' }).eq('project_version_id', versionId),
         this.getVersionById(versionId)
       ]);
@@ -504,7 +682,7 @@ export const versionService = {
       const stats: VersionStats = {
         version_id: versionId,
         pages_count: pagesResult.count || 0,
-        published_pages_count: (await publishedResult).count || 0,
+        published_pages_count: publishedResult.count || 0,
         total_views: viewsResult.count || 0,
         creation_date: versionData.data!.created_at,
         publish_date: versionData.data!.published_at
