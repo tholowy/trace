@@ -1,14 +1,18 @@
+// Modificaciones para tu ProjectSettingsPage.tsx
+
 import { type FC, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, AlertTriangle, Trash2 } from 'lucide-react';
+import { Save, AlertTriangle, Trash2, Globe, Eye } from 'lucide-react';
 import { projectService } from '../../services/projectService';
-import type { Project } from '../../types';
+import { publicationService } from '../../services/publicationService';
+import type { Project, PublicSite } from '../../types';
 
 const ProjectSettingsPage: FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
   const [project, setProject] = useState<Project | null>(null);
+  const [publicSite, setPublicSite] = useState<PublicSite | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -19,31 +23,47 @@ const ProjectSettingsPage: FC = () => {
     description: string;
     slug: string;
     is_public: boolean;
+    // Configuración básica del sitio público
+    site_name: string;
+    site_description: string;
   }>({
     name: '',
     description: '',
     slug: '',
     is_public: false,
+    site_name: '',
+    site_description: '',
   });
 
   useEffect(() => {
-    async function fetchProject() {
+    async function fetchProjectData() {
       if (!projectId) return;
 
       try {
         setLoading(true);
 
-        const { data, error } = await projectService.getProjectById(projectId);
+        // Obtener proyecto
+        const { data: projectData, error: projectError } = await projectService.getProjectById(projectId);
+        if (projectError) throw projectError;
+        if (!projectData) throw new Error('Proyecto no encontrado');
 
-        if (error) throw error;
-        if (!data) throw new Error('Proyecto no encontrado');
+        setProject(projectData);
 
-        setProject(data);
+        // Si el proyecto es público, intentar obtener configuración del sitio
+        let siteData = null;
+        if (projectData.is_public) {
+          const { data: siteResult } = await publicationService.getPublicSite(projectId);
+          siteData = siteResult;
+          setPublicSite(siteData);
+        }
+
         setFormData({
-          name: data.name,
-          description: data.description || '',
-          slug: data.slug,
-          is_public: data.is_public,
+          name: projectData.name,
+          description: projectData.description || '',
+          slug: projectData.slug,
+          is_public: projectData.is_public,
+          site_name: siteData?.site_name || projectData.name,
+          site_description: siteData?.description || projectData.description || '',
         });
       } catch (err: any) {
         setError('Error al cargar el proyecto: ' + err.message);
@@ -52,7 +72,7 @@ const ProjectSettingsPage: FC = () => {
       }
     }
 
-    fetchProject();
+    fetchProjectData();
   }, [projectId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -74,11 +94,43 @@ const ProjectSettingsPage: FC = () => {
       setError(null);
       setSuccess(null);
 
-      const { data, error } = await projectService.updateProject(projectId, formData);
+      // 1. Actualizar proyecto
+      const { data: updatedProject, error: projectError } = await projectService.updateProject(projectId, {
+        name: formData.name,
+        description: formData.description,
+        slug: formData.slug,
+        is_public: formData.is_public,
+      });
 
-      if (error) throw error;
+      if (projectError) throw projectError;
+      setProject(updatedProject);
 
-      setProject(data);
+      // 2. Si se marcó como público, crear/actualizar configuración del sitio
+      if (formData.is_public) {
+        const siteConfig = {
+          site_name: formData.site_name,
+          description: formData.site_description,
+          navigation_style: 'sidebar' as const,
+          show_search: true,
+          show_breadcrumbs: true,
+          is_active: true,
+          primary_color: '#3B82F6',
+          secondary_color: '#1E40AF',
+        };
+
+        const { data: siteData, error: siteError } = await publicationService.createOrUpdatePublicSite(
+          projectId,
+          siteConfig
+        );
+
+        if (siteError) throw siteError;
+        setPublicSite(siteData);
+      } else if (!formData.is_public && publicSite) {
+        // Si se desmarcó como público, desactivar el sitio
+        await publicationService.createOrUpdatePublicSite(projectId, { is_active: false });
+        setPublicSite(null);
+      }
+
       setSuccess('Configuración actualizada correctamente');
 
       // Clear message after 3 seconds
@@ -138,7 +190,7 @@ const ProjectSettingsPage: FC = () => {
 
       {success && (
         <div className="mb-4 p-3 bg-success/10 text-success rounded-md flex items-center">
-          <Save size={20} className="mr-2" /> {/* Changed icon to Save for success */}
+          <Save size={20} className="mr-2" />
           {success}
         </div>
       )}
@@ -160,7 +212,7 @@ const ProjectSettingsPage: FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={handleChange}
-                  className="form-input" // Apply custom form-input class
+                  className="form-input"
                   required
                 />
               </div>
@@ -174,7 +226,7 @@ const ProjectSettingsPage: FC = () => {
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  className="form-input min-h-[80px]" // Apply custom form-input and min-height
+                  className="form-input min-h-[80px]"
                   rows={3}
                 />
               </div>
@@ -189,7 +241,7 @@ const ProjectSettingsPage: FC = () => {
                   type="text"
                   value={formData.slug}
                   onChange={handleChange}
-                  className="form-input" // Apply custom form-input class
+                  className="form-input"
                   required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -197,27 +249,76 @@ const ProjectSettingsPage: FC = () => {
                 </p>
               </div>
 
-              <div className="mb-4 flex items-center">
-                <input
-                  id="is_public"
-                  name="is_public"
-                  type="checkbox"
-                  checked={formData.is_public}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-primary border-border rounded focus:ring-primary bg-background" // Use primary color for checkbox, adjusted border and bg
-                />
-                <label htmlFor="is_public" className="ml-2 text-sm font-medium text-muted-foreground">
-                  Proyecto público
-                </label>
-                <p className="text-xs text-muted-foreground ml-2">
+              <div className="mb-6 p-4 border border-border rounded-lg">
+                <div className="flex items-center mb-3">
+                  <input
+                    id="is_public"
+                    name="is_public"
+                    type="checkbox"
+                    checked={formData.is_public}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary bg-background"
+                  />
+                  <label htmlFor="is_public" className="ml-2 text-sm font-medium text-foreground flex items-center">
+                    <Globe size={16} className="mr-1" />
+                    Proyecto público
+                  </label>
+                </div>
+                
+                <p className="text-xs text-muted-foreground mb-3">
                   Si está marcado, cualquiera con el enlace podrá ver la documentación.
+                  {formData.is_public && (
+                    <span className="block mt-1 text-primary">
+                      URL pública: /docs/{formData.slug}
+                    </span>
+                  )}
                 </p>
+
+                {/* Configuración adicional del sitio público */}
+                {formData.is_public && (
+                  <div className="mt-4 space-y-4 border-t border-border pt-4">
+                    <h3 className="text-sm font-medium text-foreground">Configuración del sitio público</h3>
+                    
+                    <div>
+                      <label htmlFor="site_name" className="block mb-1 text-sm font-medium text-muted-foreground">
+                        Nombre del sitio público
+                      </label>
+                      <input
+                        id="site_name"
+                        name="site_name"
+                        type="text"
+                        value={formData.site_name}
+                        onChange={handleChange}
+                        className="form-input"
+                        placeholder={formData.name}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Aparecerá como título en el sitio público
+                      </p>
+                    </div>
+
+                    <div>
+                      <label htmlFor="site_description" className="block mb-1 text-sm font-medium text-muted-foreground">
+                        Descripción del sitio
+                      </label>
+                      <textarea
+                        id="site_description"
+                        name="site_description"
+                        value={formData.site_description}
+                        onChange={handleChange}
+                        className="form-input min-h-[60px]"
+                        rows={2}
+                        placeholder={formData.description}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="btn-primary" // Apply custom btn-primary class
+                  className="btn-primary"
                   disabled={saving}
                 >
                   <Save size={16} className="mr-1.5" />
@@ -229,7 +330,31 @@ const ProjectSettingsPage: FC = () => {
         </div>
 
         {/* Panel lateral */}
-        <div>
+        <div className="space-y-6">
+          {/* Vista previa del sitio público */}
+          {formData.is_public && (
+            <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
+              <h2 className="text-lg font-medium mb-4 text-card-foreground flex items-center">
+                <Eye size={20} className="mr-2" />
+                Sitio público
+              </h2>
+              
+              <p className="text-muted-foreground mb-4 text-sm">
+                Tu documentación está disponible públicamente
+              </p>
+
+              <a
+                href={`/docs/${formData.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary w-full text-center"
+              >
+                <Globe size={16} className="mr-1.5" />
+                Ver sitio público
+              </a>
+            </div>
+          )}
+
           {/* Zona de peligro */}
           <div className="bg-card rounded-lg shadow-sm p-6 border border-destructive/40">
             <h2 className="text-lg font-medium mb-4 text-destructive flex items-center">
@@ -237,13 +362,13 @@ const ProjectSettingsPage: FC = () => {
               Zona de peligro
             </h2>
 
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-4 text-sm">
               Las acciones a continuación son destructivas y no se pueden deshacer.
             </p>
 
             <button
               onClick={handleDeleteProject}
-              className="w-full btn-primary bg-destructive hover:bg-destructive/90" // Apply btn-primary and override colors for destructive
+              className="w-full btn-primary bg-destructive hover:bg-destructive/90"
               disabled={saving}
             >
               <Trash2 size={16} className="mr-1.5" />

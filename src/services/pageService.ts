@@ -357,6 +357,7 @@ export const pageService = {
         .eq('project_id', currentPage.project_id)
 
       if (currentPage.parent_page_id) supabaseQuery = supabaseQuery.eq('parent_page_id', currentPage.parent_page_id);
+      else supabaseQuery.is('parent_page_id', null);
 
       const { data: siblings } = await supabaseQuery
         .order('order_index', { ascending: true });

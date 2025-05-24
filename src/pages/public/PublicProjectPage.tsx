@@ -80,7 +80,7 @@ const PublicProjectPage: FC = () => {
 
         // Cargar árbol de páginas publicadas solo si hay un proyecto válido
         if (projectData?.id && currentVersionData?.id) {
-          const { data: treeData } = await pageService.getPageTree(projectData.id, currentVersionData.id);
+          const { data: treeData } = await pageService.getPageTree(projectData.id); //currentVersionData.id TODO
           setPageTree(treeData || []);
 
           // Expandir nodos de primer nivel por defecto
