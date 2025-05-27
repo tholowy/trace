@@ -5,8 +5,6 @@ import Heading from '@yoopta/headings';
 import BlockQuote from '@yoopta/blockquote';
 import Code from '@yoopta/code';
 import Table from '@yoopta/table';
-// ❌ REMOVER: import Image from '@yoopta/image';
-// ✅ AGREGAR: Nuestro ImagePlugin personalizado
 import { ImagePlugin } from '../editor/plugins/ImagePlugin';
 import Link from '@yoopta/link';
 import Lists from '@yoopta/lists';
@@ -97,7 +95,6 @@ const PageEditor: FC<PageEditorProps> = ({
     Lists.TodoList,
     MermaidPlugin,
     Table,
-    // ✅ USAR: Nuestro ImagePlugin con la nueva arquitectura
     ImagePlugin,
     SubPagePlugin
   ], []);
@@ -414,7 +411,6 @@ const PageEditor: FC<PageEditorProps> = ({
               </div>
             </div>
           </div>
-
           {/* ✅ ACTUALIZAR: Yoopta Editor sin pluginProps */}
           <div className="mb-8">
             <YooptaEditor

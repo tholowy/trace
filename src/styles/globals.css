@@ -239,6 +239,7 @@ button {
   .yoo-action-menu-list-content,
   .yoo-link-tool,
   .yoopta-action-menu-list,
+  .yoopta-action-menu-list-content,
   .yoo-image-flex {
     @apply bg-card border border-border shadow-md rounded-lg;
 
