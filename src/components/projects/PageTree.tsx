@@ -20,7 +20,6 @@ import { pageService } from '../../services/pageService';
 import type { 
   Page, 
   PageTreeNode, 
-  PageType,
   CreatePageOptions 
 } from '../../types';
 
@@ -65,25 +64,11 @@ const PageTreeItem: React.FC<PageTreeItemProps> = ({
   const hasChildren = node.children && node.children.length > 0;
   const canHaveChildren = level < maxDepth;
 
-  const getPageTypeIcon = (pageType: PageType, hasContent: boolean) => {
-    switch (pageType) {
-      case 'container':
-        return isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />;
-      case 'content':
-        return <FileText size={16} />;
-      case 'mixed':
-        return hasContent ? <Database size={16} /> : <Folder size={16} />;
-      default:
-        return <File size={16} />;
-    }
-  };
-
   const handleSelect = () => {
     onSelect({
       id: node.id,
       title: node.title,
       slug: node.slug,
-      page_type: node.page_type,
       has_content: node.has_content,
       is_published: node.is_published,
       order_index: node.order_index,
@@ -130,11 +115,7 @@ const PageTreeItem: React.FC<PageTreeItemProps> = ({
           <div className={`mr-2 flex-shrink-0 ${
             isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
           }`}>
-            {node.icon ? (
-              <span className="text-base">{node.icon}</span>
-            ) : (
-              getPageTypeIcon(node.page_type, node.has_content)
-            )}
+            {node.icon && <span className="text-base">{node.icon}</span>}
           </div>
 
           {/* Título y metadata */}
@@ -151,11 +132,6 @@ const PageTreeItem: React.FC<PageTreeItemProps> = ({
                 {!node.is_published && (
                   <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 rounded">
                     Draft
-                  </span>
-                )}
-                {node.page_type === 'mixed' && (
-                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded">
-                    Mixed
                   </span>
                 )}
               </div>
@@ -610,7 +586,6 @@ const CreatePageModal: React.FC<CreatePageModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [pageType, setPageType] = useState<PageType>('content');
   const [icon, setIcon] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -621,7 +596,6 @@ const CreatePageModal: React.FC<CreatePageModalProps> = ({
     onCreate({
       title: title.trim(),
       description: description.trim() || undefined,
-      page_type: pageType,
       icon: icon.trim() || undefined,
       parent_page_id: parentId
     });
@@ -629,7 +603,6 @@ const CreatePageModal: React.FC<CreatePageModalProps> = ({
     // Reset form
     setTitle('');
     setDescription('');
-    setPageType('content');
     setIcon('');
   };
 
@@ -673,21 +646,6 @@ const CreatePageModal: React.FC<CreatePageModalProps> = ({
               placeholder="Descripción opcional"
               rows={3}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Tipo de página
-            </label>
-            <select
-              value={pageType}
-              onChange={(e) => setPageType(e.target.value as PageType)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="content">Contenido - Solo texto y contenido</option>
-              <option value="container">Contenedor - Solo para agrupar páginas</option>
-              <option value="mixed">Mixta - Contenido y subpáginas</option>
-            </select>
           </div>
 
           <div>

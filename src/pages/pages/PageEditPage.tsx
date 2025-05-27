@@ -37,7 +37,7 @@ const PageEditPage: FC = () => {
   
   const handleSave = () => {
     if (pageId) {
-      navigate(`/projects/${projectId}/pages/${pageId}`);
+      // navigate(`/projects/${projectId}/pages/${pageId}`);
     }
   };
   

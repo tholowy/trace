@@ -1,5 +1,5 @@
 import { useState, useEffect, type FC } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Folder, Users, Calendar, MoreHorizontal, Pencil, Trash2, FileText, Layers, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -14,6 +14,7 @@ const ProjectsPage: FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingStats, setLoadingStats] = useState<boolean>(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProjects();
@@ -235,84 +236,91 @@ const ProjectsPage: FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map(project => {
-            const stats = getProjectStats(project.id);
-            return (
-              <Link
-                to={`/projects/${project.id}`}
-                key={project.id}
-                className="group bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition p-5 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Folder size={20} className="text-primary" />
-                      <span className="font-semibold text-lg">{project.name}</span>
-                      {project.is_public && (
-                        <span className="ml-2 px-2 py-0.5 rounded text-xs bg-secondary text-secondary-foreground">Público</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
-                      <Link
-                        to={`/projects/${project.slug}/edit`}
-                        onClick={e => e.stopPropagation()}
-                        className="text-muted-foreground hover:text-primary"
-                        title="Editar"
-                      >
-                        <Pencil size={16} />
-                      </Link>
-                      <button
-                        onClick={e => handleDeleteProject(project.id, e)}
-                        className="text-muted-foreground hover:text-destructive"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <Link
-                        to={`/projects/${project.slug}`}
-                        onClick={e => e.stopPropagation()}
-                        className="text-muted-foreground hover:text-accent"
-                        title="Ver"
-                      >
-                        <Eye size={16} />
-                      </Link>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-4 mt-2">
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Users size={14} className="mr-1" />
-                      {stats?.members_count ?? 0} miembros
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <FileText size={14} className="mr-1" />
-                      {stats?.pages_count ?? 0} páginas
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Layers size={14} className="mr-1" />
-                      {stats?.versions_count ?? 1} versiones
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <FileText size={14} className="mr-1" />
-                      {stats?.published_pages_count ?? 0} publicadas
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mt-6 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar size={12} />
-                    Creado: {format(new Date(project.created_at), "dd MMM yyyy", { locale: es })}
-                  </div>
-                  {stats?.last_page_update && (
-                    <div className="flex items-center gap-1">
-                      <MoreHorizontal size={12} />
-                      Última actualización: {format(new Date(stats.last_page_update), "dd MMM yyyy", { locale: es })}
-                    </div>
+      {projects.map(project => {
+        const stats = getProjectStats(project.id);
+        return (
+          <div
+            key={project.id}
+            className="group bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition p-5 flex flex-col justify-between cursor-pointer"
+            onClick={() => navigate(`/projects/${project.id}`)}
+            tabIndex={0}
+            role="button"
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate(`/projects/${project.id}`);
+              }
+            }}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Folder size={20} className="text-primary" />
+                  <span className="font-semibold text-lg">{project.name}</span>
+                  {project.is_public && (
+                    <span className="ml-2 px-2 py-0.5 rounded text-xs bg-secondary text-secondary-foreground">Público</span>
                   )}
                 </div>
-              </Link>
-            );
-          })}
-        </div>
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
+                  <Link
+                    to={`/projects/${project.id}/edit`}
+                    onClick={e => e.stopPropagation()}
+                    className="text-muted-foreground hover:text-primary"
+                    title="Editar"
+                  >
+                    <Pencil size={16} />
+                  </Link>
+                  <button
+                    onClick={e => handleDeleteProject(project.id, e)}
+                    className="text-muted-foreground hover:text-destructive"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <Link
+                    to={`/projects/${project.id}`}
+                    onClick={e => e.stopPropagation()}
+                    className="text-muted-foreground hover:text-accent"
+                    title="Ver"
+                  >
+                    <Eye size={16} />
+                  </Link>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 mt-2">
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Users size={14} className="mr-1" />
+                  {stats?.members_count ?? 0} miembros
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <FileText size={14} className="mr-1" />
+                  {stats?.pages_count ?? 0} páginas
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Layers size={14} className="mr-1" />
+                  {stats?.versions_count ?? 1} versiones
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <FileText size={14} className="mr-1" />
+                  {stats?.published_pages_count ?? 0} publicadas
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-6 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Calendar size={12} />
+                Creado: {format(new Date(project.created_at), "dd MMM yyyy", { locale: es })}
+              </div>
+              {stats?.last_page_update && (
+                <div className="flex items-center gap-1">
+                  <MoreHorizontal size={12} />
+                  Última actualización: {format(new Date(stats.last_page_update), "dd MMM yyyy", { locale: es })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
       )}
     </div>
   );

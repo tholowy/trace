@@ -441,7 +441,6 @@ export interface SearchPagesOptions {
   query: string;
   project_id?: string;
   project_version_id?: string;
-  page_type?: PageType;
   only_published?: boolean;
   limit?: number;
   offset?: number;
@@ -461,7 +460,6 @@ export interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: any }>;
   updatePassword: (password: string) => Promise<{ error: any }>;
   getUserRoles: () => Promise<{ data: Role[] | null; error: any }>;
-  refreshSession: () => Promise<{ success: boolean; error: any }>;
 }
 
 // Contexto de tema (se mantiene igual)
@@ -717,7 +715,6 @@ export interface PaginatedResponse<T> {
 export interface SearchFilters {
   query?: string;
   project_ids?: string[];
-  page_types?: PageType[];
   tags?: string[];
   created_after?: string;
   created_before?: string;

@@ -10,14 +10,14 @@ interface ProjectFormProps {
   onSuccess: (projectId: string) => void;
 }
 
-const ProjectForm: FC<ProjectFormProps> = ({ 
-  projectId, 
+const ProjectForm: FC<ProjectFormProps> = ({
+  projectId,
   onCancel,
   onSuccess
 }) => {
   const { user } = useAuth();
   const isEditing = Boolean(projectId);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -25,23 +25,22 @@ const ProjectForm: FC<ProjectFormProps> = ({
     is_public: false,
     logo_url: ''
   });
-  
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Cargar proyecto existente si estamos editando
+
   useEffect(() => {
     async function fetchProject() {
       if (!projectId) return;
-      
+
       try {
         setLoading(true);
         const { data, error } = await projectService.getProjectById(projectId);
-        
+
         if (error) throw error;
-        
+
         if (data) {
           setFormData({
             name: data.name,
@@ -50,7 +49,7 @@ const ProjectForm: FC<ProjectFormProps> = ({
             is_public: data.is_public,
             logo_url: data.logo_url || ''
           });
-          
+
           if (data.logo_url) {
             setLogoPreview(data.logo_url);
           }
@@ -61,151 +60,158 @@ const ProjectForm: FC<ProjectFormProps> = ({
         setLoading(false);
       }
     }
-    
+
     fetchProject();
   }, [projectId]);
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' 
-        ? (e.target as HTMLInputElement).checked 
+      [name]: type === 'checkbox'
+        ? (e.target as HTMLInputElement).checked
         : value
     }));
-    
-    // Generar slug automáticamente desde el nombre
+
     if (name === 'name') {
       const slug = value
         .toLowerCase()
         .replace(/[^\w\s]/gi, '')
         .replace(/\s+/g, '-');
-        
+
       setFormData(prev => ({ ...prev, slug }));
     }
   };
-  
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
   };
-  
+
+
   const uploadLogo = async (): Promise<string | null> => {
     if (!logoFile) return formData.logo_url;
-    
+
     try {
       const fileExt = logoFile.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `documentation-images/${fileName}`;
-      
+
+      // Obtener el usuario actual para crear la estructura de carpetas
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      // Usar la misma estructura que imageService
+      const filePath = `${user.id}/logos/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
-        .from('public')
+        .from('documentation-images')
         .upload(filePath, logoFile);
-        
+
       if (uploadError) throw uploadError;
-      
+
       const { data: { publicUrl } } = supabase.storage
-        .from('public')
+        .from('documentation-images')
         .getPublicUrl(filePath);
-        
+
       return publicUrl;
     } catch (err) {
-      throw new Error('Error al subir el logo: ' + err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      throw new Error('Error al subir el logo: ' + errorMessage);
     }
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       let logoUrl = formData.logo_url;
-      
-      // Subir logo si hay uno nuevo
+
       if (logoFile) {
         logoUrl = await uploadLogo() || '';
       }
-      
+
       const projectData: any = {
         ...formData,
         logo_url: logoUrl
       };
-      
-      // Agregar campos adicionales para creación
+
       if (!isEditing && user) {
         projectData.created_by = user.id;
       }
-      
+
       let result;
-      
+
       if (isEditing && projectId) {
         result = await projectService.updateProject(projectId, projectData);
       } else {
         result = await projectService.createProject(projectData);
       }
-      
-      const { data, error } = result;
-      
-      if (error) throw error;
-      
-      // Si es un nuevo proyecto, agregar al usuario como miembro/admin
+
+      const { data, error: submissionError } = result;
+
+      if (submissionError) throw submissionError;
+
       if (!isEditing && data && user) {
         await projectService.addProjectMember(data.id, user.id, 'admin');
       }
-      
+
       if (data) onSuccess(data.id);
     } catch (err: any) {
-      setError('Error al guardar el proyecto: ' + err.message);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError('Error al guardar el proyecto: ' + errorMessage);
     } finally {
       setLoading(false);
     }
   };
-  
+
   return (
-    <div>
+    <div className="max-w-2xl mx-auto py-8 px-4"> {/* Added a max-width container for better readability on large screens */}
       <div className="mb-6">
         <button
           onClick={onCancel}
-          className="flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="flex items-center text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft size={16} className="mr-1" />
+          <ArrowLeft size={16} className="mr-1.5" /> {/* Slightly more space for the icon */}
           Volver
         </button>
       </div>
-      
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">
+
+      {/* Applied card styling from your design system */}
+      <div className="bg-card text-card-foreground rounded-lg shadow-md p-6 sm:p-8 border border-border"> {/* Added border for consistency */}
+        <h1 className="text-2xl font-bold mb-6 text-foreground">
           {isEditing ? 'Editar Proyecto' : 'Crear Nuevo Proyecto'}
         </h1>
-        
+
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          // Applied destructive alert styling
+          <div className="mb-4 p-3 bg-destructive text-destructive-foreground rounded-md text-sm">
             {error}
           </div>
         )}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Logo del Proyecto</label>
-            <div className="flex items-start space-x-4">
-              <div className="h-24 w-24 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+
+        <form onSubmit={handleSubmit} className="space-y-6"> {/* Added space-y for consistent vertical spacing */}
+          <div> {/* Changed from mb-6 to rely on space-y-6 from form */}
+            <label className="block text-sm font-medium mb-2 text-foreground">Logo del Proyecto</label> {/* Increased mb for label */}
+            <div className="flex flex-col sm:flex-row items-start sm:space-x-4 space-y-4 sm:space-y-0">
+              <div className="h-24 w-24 rounded-lg bg-muted flex items-center justify-center overflow-hidden border border-border-light shrink-0"> {/* Added border */}
                 {logoPreview ? (
-                  <img 
-                    src={logoPreview} 
-                    alt="Logo preview" 
+                  <img
+                    src={logoPreview}
+                    alt="Logo preview"
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <Upload size={24} className="text-gray-400" />
+                  <Upload size={32} className="text-muted-foreground" /> /* Slightly larger icon */
                 )}
               </div>
-              
+
               <div>
                 <input
                   type="file"
@@ -216,19 +222,20 @@ const ProjectForm: FC<ProjectFormProps> = ({
                 />
                 <label
                   htmlFor="logo"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
+                  // Applied btn-secondary styling
+                  className="btn-secondary cursor-pointer"
                 >
                   Seleccionar Imagen
                 </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Formato recomendado: PNG o JPG. Tamaño máximo 2MB.
+                <p className="text-xs text-muted-foreground mt-2">
+                  PNG o JPG. Máx 2MB.
                 </p>
               </div>
             </div>
           </div>
-          
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium mb-1.5 text-foreground">
               Nombre del Proyecto*
             </label>
             <input
@@ -237,14 +244,15 @@ const ProjectForm: FC<ProjectFormProps> = ({
               type="text"
               value={formData.name}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              // Applied form-input styling
+              className="form-input"
               placeholder="Mi Proyecto"
               required
             />
           </div>
-          
-          <div className="mb-4">
-            <label htmlFor="slug" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+
+          <div>
+            <label htmlFor="slug" className="block text-sm font-medium mb-1.5 text-foreground">
               URL del Proyecto (slug)*
             </label>
             <input
@@ -253,17 +261,18 @@ const ProjectForm: FC<ProjectFormProps> = ({
               type="text"
               value={formData.slug}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              // Applied form-input styling
+              className="form-input"
               placeholder="mi-proyecto"
               required
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Esta será la URL para acceder al proyecto: /p/{formData.slug}
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Será la URL: /p/{formData.slug || "mi-proyecto"}
             </p>
           </div>
-          
-          <div className="mb-4">
-            <label htmlFor="description" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium mb-1.5 text-foreground">
               Descripción
             </label>
             <textarea
@@ -271,40 +280,47 @@ const ProjectForm: FC<ProjectFormProps> = ({
               name="description"
               value={formData.description}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Describe brevemente el proyecto..."
+              // Applied form-input styling, recommend adding rows and potentially h-auto if h-9 is too restrictive
+              className="form-input h-auto" // Allow textarea to respect rows
+              rows={4} // Reasonable default height
+              placeholder="Describe brevemente tu proyecto..."
             />
           </div>
-          
-          <div className="mb-4 flex items-center">
+
+          <div className="flex items-start"> {/* Changed to items-start for better alignment with multiline text */}
             <input
               id="is_public"
               name="is_public"
               type="checkbox"
               checked={formData.is_public}
               onChange={handleChange}
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+              // Styled checkbox to use theme colors
+              className="h-4 w-4 accent-primary border-input rounded focus:ring-ring mt-0.5 shrink-0"
             />
-            <label htmlFor="is_public" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Proyecto público
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-              Si está marcado, cualquiera con el enlace podrá ver la documentación.
-            </p>
+            <div className="ml-3 text-sm"> {/* Wrapped label and p in a div for better structure */}
+              <label htmlFor="is_public" className="font-medium text-foreground">
+                Proyecto público
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Si está marcado, cualquiera con el enlace podrá ver la documentación.
+              </p>
+            </div>
           </div>
-          
-          <div className="flex justify-end mt-6">
+
+          <div className="flex justify-end items-center pt-2 space-x-3"> {/* Added space-x for button spacing */}
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 mr-2"
+              // Applied btn-secondary styling
+              className="btn-secondary"
               disabled={loading}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
+              // Applied btn-primary styling
+              className="btn-primary"
               disabled={loading}
             >
               <Save size={16} className="mr-2" />

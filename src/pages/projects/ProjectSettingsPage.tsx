@@ -1,7 +1,7 @@
 // Modificaciones para tu ProjectSettingsPage.tsx
 
 import { type FC, useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Save, AlertTriangle, Trash2, Globe, Eye } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { publicationService } from '../../services/publicationService';
@@ -343,15 +343,15 @@ const ProjectSettingsPage: FC = () => {
                 Tu documentación está disponible públicamente
               </p>
 
-              <a
-                href={`/docs/${formData.slug}`}
+              <Link
+                to={`/docs/${formData.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary w-full text-center"
               >
                 <Globe size={16} className="mr-1.5" />
                 Ver sitio público
-              </a>
+              </Link>
             </div>
           )}
 
