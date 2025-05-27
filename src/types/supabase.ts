@@ -86,7 +86,7 @@ export type Database = {
       [key: string]: any;
     };
     Functions: {
-      search_documents: (args: {
+      search_pages: (args: {
         search_term: string;
         project_id_param?: string;
         category_id_param?: string;

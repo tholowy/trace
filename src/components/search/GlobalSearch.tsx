@@ -83,7 +83,7 @@ const GlobalSearch = () => {
           const recentIndex = selectedIndex - results.length;
           if (recentIndex >= 0 && recentIndex < recentSearches.length) {
             setQuery(recentSearches[recentIndex].query);
-            searchDocuments(recentSearches[recentIndex].query);
+            searchPages(recentSearches[recentIndex].query);
             setIsOpen(false); // Close after selecting a recent search to re-run query
           }
         }
@@ -105,7 +105,7 @@ const GlobalSearch = () => {
   }, [isOpen]);
 
   // Document search function
-  const searchDocuments = async (searchTerm: string) => {
+  const searchPages = async (searchTerm: string) => {
     if (!searchTerm || searchTerm.trim().length < 2) {
       setResults([]);
       setLoading(false); // Ensure loading is false if query is too short
@@ -116,7 +116,7 @@ const GlobalSearch = () => {
       setLoading(true);
 
       // Call Supabase search function
-      const { data, error } = await supabase.rpc('search_documents', {
+      const { data, error } = await supabase.rpc('search_pages', {
         search_term: searchTerm,
         limit_param: 10,
         offset_param: 0
@@ -153,7 +153,7 @@ const GlobalSearch = () => {
   // Effect to trigger search when debounced query changes
   useEffect(() => {
     if (isOpen && debouncedQuery) {
-      searchDocuments(debouncedQuery);
+      searchPages(debouncedQuery);
     } else if (!debouncedQuery && isOpen) {
       setResults([]); // Clear results if query is empty
     }
@@ -203,7 +203,7 @@ const GlobalSearch = () => {
 
       {/* Search Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-overlay flex items-start justify-center pt-16 sm:pt-20 p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-overlay flex items-start justify-center pt-16 sm:pt-20 p-4 z-45 animate-fade-in">
           <div
             ref={searchRef}
             className="bg-card rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col border border-border animate-scale-in"
@@ -288,7 +288,7 @@ const GlobalSearch = () => {
                             <button
                               onClick={() => {
                                 setQuery(item.query);
-                                searchDocuments(item.query);
+                                searchPages(item.query);
                                 setIsOpen(false); // Close after selecting
                               }}
                               className={`w-full text-left p-3 rounded-md flex items-center group transition-colors duration-200

@@ -497,7 +497,7 @@ const CreateVersionModal: FC<CreateVersionModalProps> = ({ isOpen, projectId, on
 
   return (
     <div
-      className="fixed inset-0 bg-background/80 flex items-center justify-center z-50 p-4 animate-fade-in"
+      className="fixed inset-0 bg-background/80 flex items-center justify-center z-45 p-4 animate-fade-in"
       onClick={onClose} // Close modal when clicking outside
     >
       <div

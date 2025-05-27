@@ -247,7 +247,20 @@ button {
       @apply bg-card border-border;
     }
   }
+  
+  .yoopta-toolbar-root,
+  .yoopta-block-options-menu-content,
+  .yoopta-link-tool,
+  .yoo-action-menu-flex{
+    @apply bg-card shadow-md rounded-lg border-none;
 
+    .dark & {
+      @apply bg-card;
+    }
+  }
+
+  .yoopta-button,
+  .yoopta-block-options-item,
   .yoo-toolbar-item,
   .yoo-action-menu-list-item,
   .yoo-block-options-item {

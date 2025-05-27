@@ -75,7 +75,6 @@ const PageEditor: FC<PageEditorProps> = ({
   const [editorReady, setEditorReady] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   
-  // ✅ ACTUALIZAR: Editor plugins con ImagePlugin corregido
   const plugins = useMemo(() => [
     Paragraph,
     Heading.HeadingOne,
@@ -104,18 +103,15 @@ const PageEditor: FC<PageEditorProps> = ({
     setContent(newContent);
   };
 
-  // ✅ ACTUALIZAR: Create editor instance con configuración global
   const editor = useMemo(() => {
     try {
       const instance = createYooptaEditor();
       
-      // ✅ AGREGAR: Hacer editor y contexto disponible globalmente para los plugins
       (window as any).yooptaEditor = instance;
       (window as any).yooptaContext = {
         projectId,
         pageId,
         readOnly,
-        // ✅ AGREGAR: Función para forzar cambios
         onEditorChange: (newContent: any) => {
           console.log('🔄 Contexto: Editor cambió');
           setContent(newContent);

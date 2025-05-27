@@ -123,45 +123,38 @@ export const projectService = {
 
   async addProjectMember(
     projectId: string,
-    userId: string, // This userId should come from a lookup or actual user registration
-    permissionLevel: ProjectMember['permission_level'] = 'viewer'
-  ): Promise<ServiceResponse<ProjectMember>> {
+    userId: string,
+    permissionLevel: 'viewer' | 'editor' | 'admin' = 'viewer'
+  ): Promise<{ data: ProjectMember | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
+      const { data: member, error: memberError } = await supabase
         .from('project_members')
         .insert({
           project_id: projectId,
           user_id: userId,
           permission_level: permissionLevel
         })
-        .select(`
-          *,
-          user_profiles (
-            id,
-            first_name,
-            last_name,
-            avatar_url,
-            email
-          )
-        `) // Select to get the full member data with user profile
+        .select('*')
         .single();
-
-      if (error) throw error;
-
-      // Structure the returned data to match ProjectMember
+  
+      if (memberError) throw memberError;
+  
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .eq('id', userId)
+        .single();
+  
+      if (profileError) throw profileError;
+  
       const newMember: ProjectMember = {
-        ...data,
+        ...member,
         user: {
-          id: data.user_profiles.id,
-          email: data.user_profiles.email,
-          profile: {
-            id: data.user_profiles.id,
-            first_name: data.user_profiles.first_name,
-            last_name: data.user_profiles.last_name,
-            avatar_url: data.user_profiles.avatar_url,
-          },
-        },
+          id: userId,
+          profile
+        }
       };
+  
       return { data: newMember, error: null };
     } catch (error: any) {
       return { data: null, error: error.message };

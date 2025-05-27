@@ -535,7 +535,7 @@ const PublicProjectPage: FC = () => {
 
       {/* Modal de búsqueda */}
       {isSearchOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 p-4 z-45">
           <div
             ref={searchRef}
             className="bg-card rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col border border-border"

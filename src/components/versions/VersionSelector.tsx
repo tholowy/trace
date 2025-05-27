@@ -224,7 +224,7 @@ const VersionSelector: React.FC<VersionSelectorProps> = ({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className={`absolute ${getDropdownPosition()} right-0 w-72 bg-popover border border-border rounded-md shadow-lg z-50 max-h-96 overflow-y-auto`}>
+        <div className={`absolute ${getDropdownPosition()} right-0 w-72 bg-popover border border-border rounded-md shadow-lg z-45 max-h-96 overflow-y-auto`}>
           {/* Header */}
           <div className="p-3 border-b border-border">
             <div className="flex items-center space-x-2">

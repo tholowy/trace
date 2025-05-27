@@ -3,7 +3,8 @@ import type { FC, FormEvent, ChangeEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
+const LoginPage: FC = () => {
+  const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -33,13 +34,13 @@ const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
   };
 
   return (
-    <div className="mx-auto py-10 px-12 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
+    <div className="mx-auto py-10 px-12 bg-card rounded-lg shadow-md border border-border">
+      <h2 className="text-2xl font-bold mb-6 text-center text-foreground">
         Iniciar Sesión
       </h2>
       
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+        <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-md border border-destructive">
           {error}
         </div>
       )}
@@ -48,7 +49,7 @@ const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
         <div className="mb-4">
           <label 
             htmlFor="email" 
-            className="block mb-2 font-medium text-gray-700 dark:text-gray-200"
+            className="block mb-2 font-medium text-foreground"
           >
             Email
           </label>
@@ -57,7 +58,7 @@ const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
             type="email"
             value={email}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
+            className="form-input" // Using the custom form-input class
             placeholder="tu@email.com"
             required
           />
@@ -66,7 +67,7 @@ const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
         <div className="mb-6">
           <label 
             htmlFor="password" 
-            className="block mb-2 font-medium text-gray-700 dark:text-gray-200"
+            className="block mb-2 font-medium text-foreground"
           >
             Contraseña
           </label>
@@ -75,7 +76,7 @@ const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
             type="password"
             value={password}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
+            className="form-input" // Using the custom form-input class
             placeholder="********"
             required
           />
@@ -84,26 +85,26 @@ const LoginPage: FC = () => {  const [email, setEmail] = useState<string>('');
         <button
           type="submit"
           disabled={loading}
-          className="w-full px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="btn-primary w-full" // Using the custom btn-primary class
         >
           {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
         </button>
       </form>
       
       <div className="mt-4 text-center">
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           ¿No tienes una cuenta?{' '}
           <Link 
             to="/register" 
-            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-link hover:text-link-hover" // Using custom link colors
           >
             Regístrate
           </Link>
         </p>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
+        <p className="text-muted-foreground mt-2">
           <Link 
             to="/forgot-password" 
-            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-link hover:text-link-hover" // Using custom link colors
           >
             ¿Olvidaste tu contraseña?
           </Link>

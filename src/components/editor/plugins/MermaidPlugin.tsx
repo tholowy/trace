@@ -16,7 +16,7 @@ const MermaidDiagram = (props: any) => {
       setSvg(svg);
     } catch (error: any) {
       console.error('Error rendering Mermaid diagram:', error);
-      setSvg(`<div style="color: red; padding: 10px; border: 1px solid red; border-radius: 4px;">
+      setSvg(`<div style="color: hsl(var(--destructive)); padding: 10px; border: 1px solid hsl(var(--destructive)); border-radius: 4px; background-color: hsl(var(--destructive) / 0.1);">
         Error en el diagrama: ${error.message || 'Sintaxis incorrecta'}
       </div>`);
     }
@@ -46,20 +46,20 @@ const MermaidDiagram = (props: any) => {
   };
   
   return (
-    <div {...attributes} className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden my-4">
+    <div {...attributes} className="border border-border rounded-md overflow-hidden my-4">
       {!readOnly && (
-        <div className="bg-gray-50 dark:bg-gray-800 p-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-secondary/20 p-3 border-b border-border">
           <textarea
             value={code}
             onChange={handleCodeChange}
             placeholder="Ingresa el código Mermaid aquí... (ejemplo: graph TD; A-->B; B-->C;)"
-            className="w-full min-h-[100px] p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white"
+            className="w-full min-h-[100px] p-2 bg-input border border-border rounded-md text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground"
           />
         </div>
       )}
       
       <div
-        className="bg-white dark:bg-gray-800 p-4 flex justify-center overflow-auto"
+        className="bg-card p-4 flex justify-center overflow-auto"
         dangerouslySetInnerHTML={{ __html: svg }}
       />
       {children}
