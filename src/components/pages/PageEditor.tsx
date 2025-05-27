@@ -5,7 +5,9 @@ import Heading from '@yoopta/headings';
 import BlockQuote from '@yoopta/blockquote';
 import Code from '@yoopta/code';
 import Table from '@yoopta/table';
-import Image from '@yoopta/image';
+// ❌ REMOVER: import Image from '@yoopta/image';
+// ✅ AGREGAR: Nuestro ImagePlugin personalizado
+import { ImagePlugin } from '../editor/plugins/ImagePlugin';
 import Link from '@yoopta/link';
 import Lists from '@yoopta/lists';
 import { MermaidPlugin } from '../editor/plugins/MermaidPlugin';
@@ -75,7 +77,7 @@ const PageEditor: FC<PageEditorProps> = ({
   const [editorReady, setEditorReady] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   
-  // Editor plugins - CON SubPagePlugin integrado
+  // ✅ ACTUALIZAR: Editor plugins con ImagePlugin corregido
   const plugins = useMemo(() => [
     Paragraph,
     Heading.HeadingOne,
@@ -95,14 +97,34 @@ const PageEditor: FC<PageEditorProps> = ({
     Lists.TodoList,
     MermaidPlugin,
     Table,
-    Image,
+    // ✅ USAR: Nuestro ImagePlugin con la nueva arquitectura
+    ImagePlugin,
     SubPagePlugin
   ], []);
   
-  // Create editor instance
+  const handleEditorChange = (newContent: any) => {
+    console.log('📝 Editor cambió:', Object.keys(newContent).length, 'bloques');
+    setContent(newContent);
+  };
+
+  // ✅ ACTUALIZAR: Create editor instance con configuración global
   const editor = useMemo(() => {
     try {
       const instance = createYooptaEditor();
+      
+      // ✅ AGREGAR: Hacer editor y contexto disponible globalmente para los plugins
+      (window as any).yooptaEditor = instance;
+      (window as any).yooptaContext = {
+        projectId,
+        pageId,
+        readOnly,
+        // ✅ AGREGAR: Función para forzar cambios
+        onEditorChange: (newContent: any) => {
+          console.log('🔄 Contexto: Editor cambió');
+          setContent(newContent);
+        }
+      };
+      
       setEditorReady(true);
       return instance;
     } catch (err) {
@@ -110,7 +132,7 @@ const PageEditor: FC<PageEditorProps> = ({
       setError("Error al inicializar el editor. Por favor, recarga la página.");
       return null;
     }
-  }, []);
+  }, [projectId, pageId, readOnly]);
   
   // Auto-save for existing pages
   useEffect(() => {
@@ -216,10 +238,6 @@ const PageEditor: FC<PageEditorProps> = ({
     }
   };
   
-  const handleEditorChange = (newContent: any) => {
-    setContent(newContent);
-  };
-  
   if (!editor) {
     return (
       <div className="bg-destructive-100 text-destructive-700 dark:bg-destructive-900/20 dark:text-destructive-400 p-4 rounded-md">
@@ -295,8 +313,6 @@ const PageEditor: FC<PageEditorProps> = ({
                   disabled={readOnly}
                 />
               </div>
-              
-              {/* SECCIÓN DE TIPO DE PÁGINA ELIMINADA */}
               
               <div>
                 <label htmlFor="icon" className="block mb-1 text-sm font-medium text-muted-foreground">
@@ -399,7 +415,7 @@ const PageEditor: FC<PageEditorProps> = ({
             </div>
           </div>
 
-          {/* Yoopta Editor con Plugin de Subpáginas Integrado */}
+          {/* ✅ ACTUALIZAR: Yoopta Editor sin pluginProps */}
           <div className="mb-8">
             <YooptaEditor
               editor={editor}
@@ -411,7 +427,7 @@ const PageEditor: FC<PageEditorProps> = ({
               marks={MARKS}
               autoFocus={true}
               className="focus:outline-none px-12"
-              style={{width: '100% ', height: 'calc(100vh-8rem)'}}
+              style={{width: '100%', height: 'calc(100vh-8rem)'}}
             />
           </div>
 

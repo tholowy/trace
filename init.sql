@@ -559,21 +559,15 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
-    (block_data->>'page_id')::UUID as referenced_page_id,
-    COALESCE(block_data->>'display_mode', 'link') as display_mode,
-    COALESCE((block_data->>'order')::INTEGER, 0) as order_in_content
-  FROM (
-    SELECT jsonb_array_elements(
-      jsonb_path_query_array(
-        content_jsonb, 
-        '$.blocks[*] ? (@.type == "sub-page")'
-      )
-    )->>'data' as block_data_text
-  ) blocks_text,
-  LATERAL jsonb_extract_path_text(blocks_text::jsonb, 'data') block_data_json,
-  LATERAL block_data_json::jsonb block_data
-  WHERE (block_data->>'page_id') IS NOT NULL;
+  SELECT
+    (block->'data'->>'page_id')::UUID AS referenced_page_id,
+    COALESCE(block->'data'->>'display_mode', 'link') AS display_mode,
+    COALESCE((block->'data'->>'order')::INTEGER, 0) AS order_in_content
+  FROM
+    jsonb_array_elements(content_jsonb->'blocks') AS block
+  WHERE
+    block->>'type' = 'sub-page'
+    AND (block->'data'->>'page_id') IS NOT NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -1011,7 +1005,7 @@ CREATE OR REPLACE FUNCTION move_page(
   new_parent_id_param UUID DEFAULT NULL,
   new_order_index_param INTEGER DEFAULT NULL
 )
-RETURNS BOOLEAN AS $
+RETURNS BOOLEAN AS $$
 DECLARE
   current_project_id UUID;
   target_project_id UUID;
@@ -1077,7 +1071,7 @@ BEGIN
   
   RETURN TRUE;
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Función para duplicar página
 CREATE OR REPLACE FUNCTION duplicate_page(
@@ -1085,7 +1079,7 @@ CREATE OR REPLACE FUNCTION duplicate_page(
   new_title TEXT DEFAULT NULL,
   new_parent_id UUID DEFAULT NULL
 )
-RETURNS UUID AS $
+RETURNS UUID AS $$
 DECLARE
   source_page pages%ROWTYPE;
   new_page_id UUID;
@@ -1148,7 +1142,7 @@ BEGIN
   
   RETURN new_page_id;
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Función para crear nueva versión del proyecto
 CREATE OR REPLACE FUNCTION create_project_version(
@@ -1157,7 +1151,7 @@ CREATE OR REPLACE FUNCTION create_project_version(
   version_name_param TEXT DEFAULT NULL,
   release_notes_param TEXT DEFAULT NULL
 )
-RETURNS UUID AS $
+RETURNS UUID AS $$
 DECLARE
   new_version_id UUID;
   page_record RECORD;
@@ -1216,13 +1210,13 @@ BEGIN
   
   RETURN new_version_id;
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Función para publicar versión del proyecto
 CREATE OR REPLACE FUNCTION publish_project_version(
   version_id_param UUID
 )
-RETURNS BOOLEAN AS $
+RETURNS BOOLEAN AS $$
 DECLARE
   version_record project_versions%ROWTYPE;
 BEGIN
@@ -1253,13 +1247,13 @@ BEGIN
   
   RETURN TRUE;
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =============== SCRIPT DE MIGRACIÓN DESDE SISTEMA ANTERIOR ===============
 
 -- Función para migrar datos del sistema categories/documents al nuevo sistema de pages
 CREATE OR REPLACE FUNCTION migrate_to_pages_system()
-RETURNS TEXT AS $
+RETURNS TEXT AS $$
 DECLARE
   category_record RECORD;
   document_record RECORD;
@@ -1350,7 +1344,7 @@ BEGIN
   migration_log := migration_log || 'Migración completada.' || CHR(10);
   RETURN migration_log;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- =============== COMENTARIOS FINALES ===============
 
