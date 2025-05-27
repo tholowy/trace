@@ -11,25 +11,23 @@ import {
 } from "lucide-react";
 import { imageService } from "../../../services/imageService";
 
-// Componente de renderizado para la imagen
 const ImageDiagram = (props: any) => {
   const { attributes, children, element } = props;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [localImageData, setLocalImageData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ Usar el hook oficial de Yoopta-Editor
   const editor = useYooptaEditor();
-
   const readOnly = editor?.readOnly || false;
-
-  // ✅ Usar el hook para obtener datos del bloque
   const blockData = useBlockData(element.id);
 
-  // Props del elemento (usar blockData si está disponible)
-  const elementProps = blockData?.props || element.props || {};
+  const elementProps = (blockData?.props && blockData.props.src) 
+    ? blockData.props 
+    : (localImageData || element.props || {});
+  
   const {
     src = "",
     alt = "",
@@ -40,87 +38,57 @@ const ImageDiagram = (props: any) => {
     imageId,
   } = elementProps;
 
-  // Obtener contexto desde el global (esto sí puede quedar así)
   const context = (window as any).yooptaContext;
   const projectId = context?.projectId;
   const pageId = context?.pageId;
 
-  // Debugging mejorado al inicio del componente
-  useEffect(() => {
-    console.log("🔍 ImageDiagram mount/update:", {
-      elementId: element.id,
-      elementType: element.type,
-      hasEditor: !!editor,
-      editorValue: editor ? Object.keys(editor.getEditorValue()) : "No editor",
-      blockData: blockData,
-      elementProps: elementProps,
-    });
-  }, [element.id, elementProps.src, elementProps.imageId]);
-
-  console.log("🔍 ImageDiagram render:", {
-    elementId: element.id,
-    elementType: element.type,
-    src: src,
-    imageId: imageId,
-    hasEditor: !!editor,
-    hasContext: !!context,
-    projectId: projectId,
-    elementProps: elementProps,
-    blockData: blockData,
-  });
-
-  // ✅ Función corregida para actualizar el elemento
-  const updateElement = (updates: any) => {
+  const updateElement = async (updates: any) => {
     console.log("🔄 Actualizando elemento:", {
       elementId: element.id,
       updates: updates,
     });
 
     if (!editor) {
-      console.error("❌ Editor no disponible");
+      console.error("Editor no disponible");
       return;
     }
 
+    const newLocalData = {
+      ...elementProps,
+      ...updates,
+    };
+    setLocalImageData(newLocalData);
+
     try {
-      // ✅ Obtener el bloque actual primero
       const currentValue = editor.getEditorValue();
       console.log("📊 Valor actual del editor:", currentValue);
 
-      // Buscar el bloque que contiene nuestro elemento
       let targetBlockId = null;
       let targetBlock = null;
 
+      // Buscar el bloque contenedor
       Object.keys(currentValue).forEach((blockId) => {
         const block = currentValue[blockId];
-        console.log(`🔍 Revisando bloque ${blockId}:`, block);
-
-        // Verificar si este bloque contiene nuestro elemento
+        
         if (block.id === element.id) {
           targetBlockId = blockId;
           targetBlock = block;
-          console.log("🎯 Elemento encontrado como bloque principal");
         } else if (block.value && Array.isArray(block.value)) {
-          const elementInBlock = block.value.find(
-            (el: any) => el.id === element.id
-          );
+          const elementInBlock = block.value.find((el: any) => el.id === element.id);
           if (elementInBlock) {
             targetBlockId = blockId;
             targetBlock = block;
-            console.log("🎯 Elemento encontrado en value array");
           }
         }
       });
 
       if (!targetBlockId || !targetBlock) {
-        console.error("❌ No se encontró el bloque contenedor");
+        console.error("No se encontró el bloque contenedor");
         return;
       }
 
-      // ✅ Actualizar usando la API correcta de updateBlock
-      // Según los tipos, updateBlock espera: (blockId: string, blockData: YooptaBlockData)
       const updatedBlockData = {
-        id: targetBlock.id,
-        type: targetBlock.type,
+        ...targetBlock,
         value: targetBlock.value
           ? targetBlock.value.map((el: any) => {
               if (el.id === element.id) {
@@ -134,69 +102,38 @@ const ImageDiagram = (props: any) => {
               }
               return el;
             })
-          : [],
-        meta: targetBlock.meta || { order: 0, depth: 0 },
+          : [
+              {
+                id: element.id,
+                type: element.type,
+                props: {
+                  ...elementProps,
+                  ...updates,
+                },
+              },
+            ],
       };
 
-      console.log("📝 Datos del bloque a actualizar:", updatedBlockData);
+      console.log("📝 Datos del bloque actualizado:", updatedBlockData);
 
-      // ✅ Llamar updateBlock con los parámetros correctos
-      editor.updateBlock(targetBlockId, updatedBlockData);
+      const newEditorValue = {
+        ...currentValue,
+        [targetBlockId]: updatedBlockData,
+      };
 
-      console.log("✅ Bloque actualizado correctamente usando updateBlock");
+      editor.setEditorValue(newEditorValue);
+      console.log("Editor actualizado con setEditorValue");
 
-      // Notificar al contexto si existe
-      if (context?.onEditorChange) {
-        console.log("📡 Notificando cambio al contexto");
-        setTimeout(() => {
-          const newValue = editor.getEditorValue();
-          context.onEditorChange(newValue);
-        }, 100);
-      }
-    } catch (err) {
-      console.error("❌ Error al actualizar con updateBlock:", err);
-
-      // ✅ Método de respaldo usando setEditorValue
-      try {
-        console.log("🔄 Intentando método de respaldo...");
-        const currentValue = editor.getEditorValue();
-        const updatedValue = { ...currentValue };
-
-        Object.keys(updatedValue).forEach((blockId) => {
-          const block = updatedValue[blockId];
-
-          if (block.value && Array.isArray(block.value)) {
-            const newValue = block.value.map((el: any) => {
-              if (el.id === element.id) {
-                console.log("🎯 Actualizando elemento en método de respaldo");
-                return {
-                  ...el,
-                  props: {
-                    ...el.props,
-                    ...updates,
-                  },
-                };
-              }
-              return el;
-            });
-
-            updatedValue[blockId] = {
-              ...block,
-              value: newValue,
-            };
-          }
-        });
-
-        editor.setEditorValue(updatedValue);
-        console.log("✅ Actualización de respaldo exitosa");
-
-        // Notificar cambio
+      setTimeout(() => {
         if (context?.onEditorChange) {
-          context.onEditorChange(updatedValue);
+          console.log("📡 Notificando cambio al contexto");
+          context.onEditorChange(newEditorValue);
         }
-      } catch (altErr) {
-        console.error("❌ Error en método de respaldo:", altErr);
-      }
+      }, 100);
+
+    } catch (err) {
+      console.error("Error al actualizar:", err);
+      // Mantener datos locales en caso de error para que la imagen siga visible
     }
   };
 
@@ -219,27 +156,49 @@ const ImageDiagram = (props: any) => {
         description: caption,
       });
 
-      console.log("✅ Imagen subida:", uploadedImage);
+      console.log("Imagen subida:", uploadedImage);
 
-      // Mostrar mensaje de éxito
       setUploadSuccess("¡Imagen subida correctamente!");
-      setTimeout(() => setUploadSuccess(null), 3000);
-
-      // ✅ Actualizar usando la función corregida
-      updateElement({
+      
+      await updateElement({
         src: uploadedImage.public_url,
         imageId: uploadedImage.id,
         width: uploadedImage.width,
         height: uploadedImage.height,
         alt: alt || file.name,
       });
+
+      setTimeout(() => setUploadSuccess(null), 2000);
+
     } catch (err) {
+      console.error("Error en upload:", err);
       setError(err instanceof Error ? err.message : "Error al subir imagen");
-      console.error("❌ Error en upload:", err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Si blockData tiene src y tenemos estado local, limpiar estado local
+    if (blockData?.props?.src && localImageData?.src) {
+      console.log("🔄 BlockData sincronizado, limpiando estado local");
+      setTimeout(() => {
+        setLocalImageData(null);
+      }, 500); // Dar tiempo para que se renderice
+    }
+  }, [blockData?.props?.src, localImageData?.src]);
+
+  useEffect(() => {
+    console.log("🔍 ImageDiagram state:", {
+      elementId: element.id,
+      hasLocalData: !!localImageData,
+      localSrc: localImageData?.src,
+      blockDataSrc: blockData?.props?.src,
+      finalSrc: src,
+      imageId: imageId,
+      willShowUploader: !src, // Esto es lo importante
+    });
+  }, [element.id, localImageData, blockData?.props, src, imageId]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -276,7 +235,7 @@ const ImageDiagram = (props: any) => {
         width: localWidth ? parseInt(localWidth) : undefined,
       };
 
-      updateElement(updates);
+      await updateElement(updates);
 
       // Actualizar metadatos en Supabase si existe imageId
       if (imageId) {
@@ -285,9 +244,9 @@ const ImageDiagram = (props: any) => {
             alt_text: localAlt,
             description: localCaption,
           });
-          console.log("✅ Metadatos actualizados en Supabase");
+          console.log("Metadatos actualizados en Supabase");
         } catch (error) {
-          console.error("❌ Error updating image metadata:", error);
+          console.error("Error updating image metadata:", error);
         }
       }
 
@@ -300,13 +259,12 @@ const ImageDiagram = (props: any) => {
         if (imageId) {
           try {
             await imageService.deleteImage(imageId);
-            console.log("✅ Imagen eliminada de Supabase");
+            console.log("Imagen eliminada de Supabase");
           } catch (error) {
-            console.error("❌ Error deleting image:", error);
+            console.error("Error deleting image:", error);
           }
         }
 
-        // ✅ Buscar el bloque que contiene el elemento y eliminarlo
         try {
           const currentValue = editor.getEditorValue();
           let targetBlockId = null;
@@ -314,9 +272,7 @@ const ImageDiagram = (props: any) => {
           Object.keys(currentValue).forEach((blockId) => {
             const block = currentValue[blockId];
             if (block.value && Array.isArray(block.value)) {
-              const hasElement = block.value.some(
-                (el: any) => el.id === element.id
-              );
+              const hasElement = block.value.some((el: any) => el.id === element.id);
               if (hasElement) {
                 targetBlockId = blockId;
               }
@@ -325,14 +281,11 @@ const ImageDiagram = (props: any) => {
 
           if (targetBlockId) {
             editor.deleteBlock(targetBlockId);
-            console.log("✅ Bloque eliminado correctamente");
-          } else {
-            throw new Error("No se encontró el bloque a eliminar");
+            console.log("Bloque eliminado correctamente");
           }
         } catch (err) {
-          console.error("❌ Error eliminando bloque:", err);
-          // Fallback: resetear elemento
-          updateElement({
+          console.error("Error eliminando bloque:", err);
+          await updateElement({
             src: "",
             imageId: undefined,
             width: undefined,
@@ -347,9 +300,9 @@ const ImageDiagram = (props: any) => {
     };
 
     const handleDownload = () => {
-      if (src) {
+      if (imageUrl) {
         const link = document.createElement("a");
-        link.href = src;
+        link.href = imageUrl;
         link.download = alt || "image";
         link.click();
       }
@@ -464,8 +417,14 @@ const ImageDiagram = (props: any) => {
     );
   };
 
-  // Si no hay imagen, mostrar área de upload
-  if (!src) {
+  const imageUrl = src || localImageData?.src;
+  const hasValidImageUrl = imageUrl && imageUrl.trim() !== "";
+  
+  const shouldShowUploader = !hasValidImageUrl && !isLoading && !uploadSuccess;
+  const shouldShowImage = hasValidImageUrl;
+  
+  // Si debe mostrar uploader, mostrar área de upload
+  if (shouldShowUploader) {
     return (
       <div
         {...attributes}
@@ -535,69 +494,164 @@ const ImageDiagram = (props: any) => {
     );
   }
 
-  // Mostrar imagen con controles
-  return (
-    <div {...attributes} className="my-4 relative group">
-      <figure
-        className={`relative ${
-          alignment === "center"
-            ? "mx-auto text-center"
-            : alignment === "right"
-            ? "ml-auto text-right"
-            : "text-left"
-        }`}
-        style={{ maxWidth: width ? `${width}px` : "none" }}
+  if (uploadSuccess && !hasValidImageUrl) {
+    return (
+      <div
+        {...attributes}
+        className="border-2 border-dashed border-green-300 dark:border-green-600 rounded-lg p-8 text-center transition-colors my-4 bg-green-50 dark:bg-green-900/10"
       >
-        <img
-          src={src}
-          alt={alt}
-          width={width}
-          height={height}
-          className="max-w-full h-auto rounded-lg shadow-sm"
-          loading="lazy"
-          onError={() => {
-            console.error("❌ Error al cargar imagen:", src);
-            setError("Error al cargar la imagen");
-          }}
-          onLoad={() => {
-            console.log("✅ Imagen cargada correctamente:", src);
-            setError(null);
-          }}
-        />
-
-        {/* Toolbar flotante - Solo si no es readOnly */}
-        {!readOnly && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
-            >
-              <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </button>
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+            <span className="text-green-600 dark:text-green-400">✓</span>
           </div>
-        )}
+          <p className="text-green-600 dark:text-green-400">
+            {uploadSuccess}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Procesando imagen...
+          </p>
+        </div>
+        {children}
+      </div>
+    );
+  }
 
-        {caption && (
-          <figcaption className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
-            {caption}
-          </figcaption>
-        )}
-      </figure>
+  if (shouldShowImage) {
+    return (
+      <div {...attributes} className="my-4 relative group">
+        <figure
+          className={`relative ${
+            alignment === "center"
+              ? "mx-auto text-center"
+              : alignment === "right"
+              ? "ml-auto text-right"
+              : "text-left"
+          }`}
+          style={{ maxWidth: width ? `${width}px` : "none" }}
+        >
+          <img
+            src={imageUrl}
+            alt={alt}
+            width={width}
+            height={height}
+            className="max-w-full h-auto rounded-lg shadow-sm"
+            loading="lazy"
+            onError={() => {
+              console.error("Error al cargar imagen:", imageUrl);
+              setError("Error al cargar la imagen");
+            }}
+            onLoad={() => {
+              console.log("Imagen cargada correctamente:", imageUrl);
+              setError(null);
+            }}
+          />
 
-      {/* Panel de configuración */}
-      {showSettings && <SettingsPanel />}
+          {/* Toolbar flotante */}
+          {!readOnly && (
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
+              >
+                <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              </button>
+            </div>
+          )}
 
+          {caption && (
+            <figcaption className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
+              {caption}
+            </figcaption>
+          )}
+        </figure>
+
+        {showSettings && <SettingsPanel />}
+        {children}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div
+        {...attributes}
+        className="border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-8 text-center transition-colors my-4 bg-blue-50 dark:bg-blue-900/10"
+      >
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-blue-600 dark:text-blue-400">
+            Subiendo imagen...
+          </p>
+        </div>
+        {children}
+      </div>
+    );
+  }
+
+  if (error && !hasValidImageUrl) {
+    return (
+      <div
+        {...attributes}
+        className="border-2 border-dashed border-red-300 dark:border-red-600 rounded-lg p-8 text-center transition-colors my-4 bg-red-50 dark:bg-red-900/10"
+      >
+        <div className="flex flex-col items-center gap-2">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-600 dark:text-red-400">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              fileInputRef.current?.click();
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      {...attributes}
+      className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors my-4"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+          <ImageIcon className="w-8 h-8 text-gray-400" />
+        </div>
+        <p className="text-gray-600 dark:text-gray-400">
+          Arrastra una imagen aquí o haz clic para seleccionar
+        </p>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+        >
+          Seleccionar imagen
+        </button>
+      </div>
       {children}
     </div>
   );
-};
 
-// ✅ Plugin corregido con configuración mejorada
+}
+
+// Plugin export
 export const ImagePlugin = new YooptaPlugin({
   type: "Image",
   elements: {
     Image: {
-      // ✅ Usar el mismo nombre que el type
       render: ImageDiagram,
       props: {
         nodeType: "void",
