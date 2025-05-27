@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, TrendingUp } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import { mermaidService } from "../services/mermaidService";
 import type { MermaidDiagram, MermaidDiagramType } from "../services/mermaidService";
 

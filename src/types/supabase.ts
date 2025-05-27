@@ -1,7 +1,7 @@
 
 // Tipos específicos para la integración con Supabase
 
-import type { Attachment, Category, DocumentVersion, Project, ProjectMember, Role, UserProfile, UserRole } from ".";
+import type { Attachment, Category, DocumentVersion, PageSearchResult, Project, ProjectMember, Role, UserProfile, UserRole } from ".";
 
 export type Tables = {
   projects: Project;
@@ -92,7 +92,7 @@ export type Database = {
         category_id_param?: string;
         limit_param?: number;
         offset_param?: number;
-      }) => SearchResult[];
+      }) => PageSearchResult[];
     };
   };
 };

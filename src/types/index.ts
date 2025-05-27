@@ -741,3 +741,4 @@ export interface ValidationResult {
   is_valid: boolean;
   errors: ValidationError[];
 }
+

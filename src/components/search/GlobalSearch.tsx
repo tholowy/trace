@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, File, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { SearchResult } from '../../types';
+import type { PageSearchResult } from '../../types';
 import useDebounce from '../../hooks/useDebounce';
 
 interface RecentSearch {
@@ -14,7 +14,7 @@ interface RecentSearch {
 const GlobalSearch = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [query, setQuery] = useState<string>('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<PageSearchResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
@@ -160,7 +160,7 @@ const GlobalSearch = () => {
   }, [debouncedQuery, isOpen]);
 
   // Handle selecting a search result
-  const handleSelectResult = (result: SearchResult) => {
+  const handleSelectResult = (result: PageSearchResult) => {
     navigate(`/projects/${result.project_id}/documents/${result.id}`);
     setIsOpen(false);
     setQuery('');
