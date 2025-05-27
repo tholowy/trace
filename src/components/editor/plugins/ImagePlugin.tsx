@@ -13,7 +13,7 @@ import { imageService } from "../../../services/imageService";
 
 // Componente de renderizado para la imagen
 const ImageDiagram = (props: any) => {
-  const { attributes, children, element, readOnly } = props;
+  const { attributes, children, element } = props;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -22,6 +22,8 @@ const ImageDiagram = (props: any) => {
 
   // ✅ Usar el hook oficial de Yoopta-Editor
   const editor = useYooptaEditor();
+
+  const readOnly = editor?.readOnly || false;
 
   // ✅ Usar el hook para obtener datos del bloque
   const blockData = useBlockData(element.id);

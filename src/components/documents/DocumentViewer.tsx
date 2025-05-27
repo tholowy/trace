@@ -6,10 +6,10 @@ import Code from '@yoopta/code';
 import Link from '@yoopta/link';
 import Lists from '@yoopta/lists';
 import Table from '@yoopta/table';
-import Image from '@yoopta/image';
 import { useEffect, useMemo, useState, type FC } from 'react';
 import mermaid from 'mermaid';
 import { ActivitySquareIcon } from 'lucide-react';
+import { ImagePlugin } from '../editor/plugins/ImagePlugin';
 // import SubPagePlugin from '../editor/plugins/SubPagePlugin';
 
 // Configuración de Mermaid
@@ -102,8 +102,8 @@ const DocumentViewer: FC<DocumentViewerProps> = ({ content }) => {
     Lists.NumberedList,
     Lists.TodoList,
     MermaidViewPlugin,
+    ImagePlugin,
     Table,
-    Image,
     // SubPagePlugin
   ], []);
   

@@ -100,7 +100,7 @@ const ProjectForm: FC<ProjectFormProps> = ({
     try {
       const fileExt = logoFile.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `project-logos/${fileName}`;
+      const filePath = `documentation-images/${fileName}`;
       
       const { error: uploadError } = await supabase.storage
         .from('public')
