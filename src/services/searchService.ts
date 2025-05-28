@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { SearchResult, ServiceResponse } from '../types';
+import type { PageSearchResult, ServiceResponse } from '../types';
 
 export const searchService = {
   async searchPages(
@@ -10,7 +10,7 @@ export const searchService = {
       limit?: number;
       offset?: number;
     }
-  ): Promise<ServiceResponse<SearchResult[]>> {
+  ): Promise<ServiceResponse<PageSearchResult[]>> {
     try {
       const { projectId, categoryId, limit = 20, offset = 0 } = options || {};
       
