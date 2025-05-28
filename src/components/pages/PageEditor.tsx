@@ -17,8 +17,8 @@ import { Bold, Italic, CodeMark, Underline, Strike, Highlight } from '@yoopta/ma
 import { pageService } from '../../services/pageService';
 import { useAuth } from '../../context/AuthContext';
 import type { Page, CreatePageOptions } from '../../types';
-import { Save, Clock, Check, FileText, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
-import { SubPagePlugin } from '../editor/plugins/SubPagePlugin';
+import { Save, Clock, Check, PanelLeftOpen, PanelLeftClose, AlertCircle } from 'lucide-react';
+// import { SubPagePlugin } from '../editor/plugins/SubPagePlugin';
 
 const MARKS = [Bold, Italic, CodeMark, Underline, Strike, Highlight];
 
@@ -59,7 +59,7 @@ const PageEditor: FC<PageEditorProps> = ({
   const { user } = useAuth();
   const isEditing = Boolean(pageId);
   
-  // Form state - SIMPLIFICADO SIN TIPOS DE PÁGINAS
+  // Form state
   const [title, setTitle] = useState<string>(initialPage?.title || '');
   const [description, setDescription] = useState<string>(initialPage?.description || '');
   const [slug, setSlug] = useState<string>(initialPage?.slug || '');
@@ -75,32 +75,49 @@ const PageEditor: FC<PageEditorProps> = ({
   const [editorReady, setEditorReady] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   
-  const plugins = useMemo(() => [
-    Paragraph,
-    Heading.HeadingOne,
-    Heading.HeadingTwo,
-    Heading.HeadingThree,
-    BlockQuote.extend({
-      options: {
-        HTMLAttributes: {
-          className: 'my-custom-blockquote',
-        },
-      },
-    }),
-    Code,
-    Link,
-    Lists.BulletedList,
-    Lists.NumberedList,
-    Lists.TodoList,
-    MermaidPlugin,
-    Table,
-    ImagePlugin,
-    SubPagePlugin
-  ], []);
+  const plugins = useMemo(() => {
+    try {
+      return [
+        Paragraph,
+        Heading.HeadingOne,
+        Heading.HeadingTwo,
+        Heading.HeadingThree,
+        BlockQuote.extend({
+          options: {
+            HTMLAttributes: {
+              className: 'my-custom-blockquote',
+            },
+          },
+        }),
+        Code,
+        Link,
+        Lists.BulletedList,
+        Lists.NumberedList,
+        Lists.TodoList,
+        MermaidPlugin,
+        Table,
+        ImagePlugin,
+        // SubPagePlugin
+      ];
+    } catch (err) {
+      console.error('Error al configurar plugins:', err);
+      setError('Error al cargar los plugins del editor.');
+      return [Paragraph]; // Fallback básico
+    }
+  }, []);
   
   const handleEditorChange = (newContent: any) => {
     console.log('📝 Editor cambió:', Object.keys(newContent).length, 'bloques');
-    setContent(newContent);
+    
+    // Validar que el contenido sea válido
+    if (typeof newContent === 'object' && newContent !== null) {
+      setContent(newContent);
+      
+      // Limpiar mensajes de error si el contenido es válido
+      if (error) {
+        setError(null);
+      }
+    }
   };
 
   const editor = useMemo(() => {
@@ -114,8 +131,15 @@ const PageEditor: FC<PageEditorProps> = ({
         readOnly,
         onEditorChange: (newContent: any) => {
           console.log('🔄 Contexto: Editor cambió');
-          setContent(newContent);
-        }
+          handleEditorChange(newContent);
+        },
+        debugInfo: () => ({
+          projectId,
+          pageId,
+          readOnly,
+          blocksCount: Object.keys(content).length,
+          lastSaved
+        })
       };
       
       setEditorReady(true);
@@ -125,18 +149,18 @@ const PageEditor: FC<PageEditorProps> = ({
       setError("Error al inicializar el editor. Por favor, recarga la página.");
       return null;
     }
-  }, [projectId, pageId, readOnly]);
+  }, [projectId, pageId, readOnly, content, lastSaved]);
   
-  // Auto-save for existing pages
+  // Auto-save mejorado
   useEffect(() => {
-    if (readOnly || !pageId || !editor || !editorReady) return;
+    if (readOnly || !pageId || !editor || !editorReady || saving) return;
     
     const timer = setTimeout(() => {
       handleAutoSave();
     }, 30000); // Auto-save every 30 seconds
     
     return () => clearTimeout(timer);
-  }, [content, title, description, pageId, readOnly, editor, editorReady]);
+  }, [content, title, description, pageId, readOnly, editor, editorReady, saving]);
   
   // Generate slug automatically from title
   useEffect(() => {
@@ -146,14 +170,14 @@ const PageEditor: FC<PageEditorProps> = ({
     }
   }, [title, isEditing]);
   
-  // Auto-save function
   const handleAutoSave = async () => {
     try {
       if (!pageId || saving || !user) return;
       
       setSaving(true);
+      setError(null);
       
-      const { error } = await pageService.updatePage(pageId, { 
+      const { error: saveError } = await pageService.updatePage(pageId, { 
         content,
         title,
         description,
@@ -161,31 +185,36 @@ const PageEditor: FC<PageEditorProps> = ({
         is_published: isPublished
       });
       
-      if (error) throw error;
+      if (saveError) throw saveError;
       
       setLastSaved(new Date());
+      
     } catch (err: any) {
-      console.error('Error al autoguardar:', err);
+      console.error('❌ Error al autoguardar:', err);
       setError('Error al autoguardar: ' + err.message);
     } finally {
       setSaving(false);
     }
   };
   
-  // Save page function
   const handleSave = async () => {
     try {
       setSaving(true);
       setError(null);
       setSuccess(null);
       
+      // Validaciones
+      if (!title.trim()) {
+        throw new Error('El título es requerido');
+      }
+      
       if (isEditing && pageId) {
         // Update existing page
         const { data, error } = await pageService.updatePage(pageId, {
-          title,
-          description,
-          slug,
-          icon,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          slug: slug.trim() || undefined,
+          icon: icon.trim() || undefined,
           content,
           is_published: isPublished
         });
@@ -199,10 +228,10 @@ const PageEditor: FC<PageEditorProps> = ({
       } else {
         // Create new page
         const options: CreatePageOptions = {
-          title,
-          description: description || undefined,
-          slug: slug || undefined,
-          icon: icon || undefined,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          slug: slug.trim() || undefined,
+          icon: icon.trim() || undefined,
           content,
           is_published: isPublished,
           parent_page_id: parentPageId
@@ -224,7 +253,9 @@ const PageEditor: FC<PageEditorProps> = ({
       setTimeout(() => {
         setSuccess(null);
       }, 3000);
+      
     } catch (err: any) {
+      console.error('❌ Error al guardar:', err);
       setError('Error al guardar la página: ' + err.message);
     } finally {
       setSaving(false);
@@ -233,33 +264,50 @@ const PageEditor: FC<PageEditorProps> = ({
   
   if (!editor) {
     return (
-      <div className="bg-destructive-100 text-destructive-700 dark:bg-destructive-900/20 dark:text-destructive-400 p-4 rounded-md">
-        Error al inicializar el editor. Por favor, recarga la página.
+      <div className="flex items-center justify-center min-h-[400px] bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Inicializando editor...</p>
+          {error && (
+            <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-md max-w-md">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-medium">Error</span>
+              </div>
+              <p className="mt-1 text-sm">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-2 text-sm underline hover:no-underline"
+              >
+                Recargar página
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
   
   return (
-    <div className="flex bg-background text-foreground dark:bg-background dark:text-foreground">
-      {/* Collapsible Sidebar for Metadata */}
+    <div className="flex bg-background text-foreground min-h-screen">
       <aside 
-        className={`flex-shrink-0 ${isSidebarOpen ? 'w-80 bg-card border-r border-border' : 'w-14'} transition-all duration-300 ease-in-out 
-                    p-4 overflow-hidden relative h-[calc(100vh-14rem)]`}
+        className={`flex-shrink-0 ${isSidebarOpen ? 'w-80' : 'w-14'} transition-all duration-300 ease-in-out 
+                    bg-card border-r border-border p-4 overflow-hidden relative h-[calc(100vh-4rem)]`}
       >
         <button 
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors"
+          className="absolute top-4 right-4 p-2 rounded-md hover:bg-muted transition-colors z-10"
           title={isSidebarOpen ? "Contraer barra lateral" : "Expandir barra lateral"}
         >
           {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
         </button>
 
         {isSidebarOpen && (
-          <div className="pt-10">
-            <h2 className="text-xl font-semibold mb-6 text-primary">Detalles de la Página</h2>
+          <div className="pt-12">
+            <h2 className="text-xl font-semibold mb-6 text-card-foreground">Detalles de la Página</h2>
             <div className="space-y-6">
               <div>
-                <label htmlFor="title" className="block mb-1 text-sm font-medium text-muted-foreground">
+                <label htmlFor="title" className="block mb-2 text-sm font-medium text-muted-foreground">
                   Título de la página *
                 </label>
                 <input 
@@ -275,7 +323,7 @@ const PageEditor: FC<PageEditorProps> = ({
               </div>
               
               <div>
-                <label htmlFor="slug" className="block mb-1 text-sm font-medium text-muted-foreground">
+                <label htmlFor="slug" className="block mb-2 text-sm font-medium text-muted-foreground">
                   URL slug
                 </label>
                 <input 
@@ -293,7 +341,7 @@ const PageEditor: FC<PageEditorProps> = ({
               </div>
               
               <div>
-                <label htmlFor="description" className="block mb-1 text-sm font-medium text-muted-foreground">
+                <label htmlFor="description" className="block mb-2 text-sm font-medium text-muted-foreground">
                   Descripción
                 </label>
                 <textarea 
@@ -308,7 +356,7 @@ const PageEditor: FC<PageEditorProps> = ({
               </div>
               
               <div>
-                <label htmlFor="icon" className="block mb-1 text-sm font-medium text-muted-foreground">
+                <label htmlFor="icon" className="block mb-2 text-sm font-medium text-muted-foreground">
                   Icono (emoji)
                 </label>
                 <input 
@@ -332,7 +380,7 @@ const PageEditor: FC<PageEditorProps> = ({
                   type="checkbox"
                   checked={isPublished}
                   onChange={(e) => setIsPublished(e.target.checked)}
-                  className="h-4 w-4 text-primary border-border rounded focus:ring-primary dark:border-gray-600 dark:bg-gray-700"
+                  className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
                   disabled={readOnly}
                 />
                 <label htmlFor="isPublished" className="ml-2 text-sm font-medium text-muted-foreground">
@@ -340,28 +388,43 @@ const PageEditor: FC<PageEditorProps> = ({
                 </label>
               </div>
 
-              {/* Editor Header */}
               {!readOnly && (
-                <div className="flex justify-end items-center mb-6">
-                  <div className="flex items-center space-x-4">
+                <div className="pt-6 border-t border-border">
+                  <div className="flex flex-col gap-3">
                     {lastSaved && (
                       <div className="text-sm text-muted-foreground flex items-center">
-                        <Clock size={14} className="mr-1" />
+                        <Clock size={14} className="mr-2" />
                         Guardado {lastSaved.toLocaleTimeString()}
                       </div>
                     )}
+                    
                     <button 
                       onClick={handleSave}
-                      className="btn-primary"
+                      className="btn-primary w-full justify-center"
                       disabled={saving || !title.trim()}
                     >
                       {saving ? (
-                        <Clock size={16} className="mr-1.5 animate-spin" />
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+                          Guardando...
+                        </>
                       ) : (
-                        <Save size={16} className="mr-1.5" />
+                        <>
+                          <Save size={16} className="mr-2" />
+                          {isEditing ? 'Guardar cambios' : 'Crear página'}
+                        </>
                       )}
-                      {saving ? 'Guardando...' : (isEditing ? 'Guardar' : 'Crear página')}
                     </button>
+                    
+                    {onCancel && (
+                      <button 
+                        onClick={onCancel}
+                        className="btn-secondary w-full justify-center"
+                        disabled={saving}
+                      >
+                        Cancelar
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -370,33 +433,40 @@ const PageEditor: FC<PageEditorProps> = ({
         )}
       </aside>
       
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col px-8 mx-14 overflow-auto h-[calc(100vh-14rem)]">
-        {/* Status Messages */}
+      <main className="flex-1 flex flex-col px-8 mx-auto max-w-4xl overflow-auto">
+        {/* Status Messages mejorados */}
         {error && (
-          <div className="mb-4 p-3 bg-destructive/10 text-destructive-foreground rounded-md">
-            {error}
+          <div className="mb-4 p-4 bg-destructive/10 text-destructive border border-destructive/20 rounded-md">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Error</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
           </div>
         )}
         
         {success && (
-          <div className="mb-4 p-3 bg-primary/10 text-primary-foreground rounded-md">
-            {success}
+          <div className="mb-4 p-4 bg-primary/10 text-primary border border-primary/20 rounded-md">
+            <div className="flex items-center gap-2">
+              <Check className="w-5 h-5 flex-shrink-0" />
+              <p>{success}</p>
+            </div>
           </div>
         )}
 
-        {/* Editor Container */}
-        <div className="flex-1 w-full bg-card rounded-lg shadow-sm p-8 pb-16 relative">
+        <div className="flex-1 w-full bg-card rounded-lg shadow-sm border border-border overflow-hidden">
           {/* Page Header */}
-          <div className="mb-8">
+          <div className="p-8 pb-4 border-b border-border">
             <div className="flex items-start space-x-4">
               {icon && (
-                <div className="text-4xl">
+                <div className="text-4xl flex-shrink-0">
                   {icon}
                 </div>
               )}
-              <div className="flex-1">
-                <h1 className="text-4xl font-extrabold mb-2">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-4xl font-bold text-card-foreground mb-2 break-words">
                   {title || 'Título de la página'}
                 </h1>
                 {description && (
@@ -407,22 +477,31 @@ const PageEditor: FC<PageEditorProps> = ({
               </div>
             </div>
           </div>
-          {/* ✅ ACTUALIZAR: Yoopta Editor sin pluginProps */}
-          <div className="mb-8">
-            <YooptaEditor
-              editor={editor}
-              plugins={plugins}
-              value={content}
-              readOnly={readOnly}
-              onChange={handleEditorChange}
-              tools={TOOLS}
-              marks={MARKS}
-              autoFocus={true}
-              className="focus:outline-none px-12"
-              style={{width: '100%', height: 'calc(100vh-8rem)'}}
-            />
-          </div>
 
+          <div className="p-8 min-h-[600px]">
+            {editorReady ? (
+              <YooptaEditor
+                editor={editor}
+                plugins={plugins}
+                value={content}
+                readOnly={readOnly}
+                onChange={handleEditorChange}
+                tools={TOOLS}
+                marks={MARKS}
+                autoFocus={!readOnly}
+                className="focus:outline-none"
+                style={{ width: '100%', minHeight: '500px' }}
+                placeholder={readOnly ? undefined : "Comienza a escribir o usa '/' para agregar contenido..."}
+              />
+            ) : (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Cargando editor...</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

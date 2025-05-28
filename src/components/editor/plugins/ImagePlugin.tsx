@@ -23,7 +23,7 @@ const ImageDiagram = (props: any) => {
   const editor = useYooptaEditor();
   const readOnly = editor?.readOnly || false;
   const blockData = useBlockData(element.id);
-
+  console.log(blockData, element, localImageData);
   const elementProps = (blockData?.props && blockData.props.src) 
     ? blockData.props 
     : (localImageData || element.props || {});

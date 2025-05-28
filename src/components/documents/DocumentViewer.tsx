@@ -1,4 +1,4 @@
-import YooptaEditor, { createYooptaEditor, YooptaPlugin } from '@yoopta/editor';
+import YooptaEditor, { createYooptaEditor } from '@yoopta/editor';
 import Paragraph from '@yoopta/paragraph';
 import Heading from '@yoopta/headings';
 import BlockQuote from '@yoopta/blockquote';
@@ -6,10 +6,10 @@ import Code from '@yoopta/code';
 import Link from '@yoopta/link';
 import Lists from '@yoopta/lists';
 import Table from '@yoopta/table';
-import { useEffect, useMemo, useState, type FC } from 'react';
+import { useMemo, type FC } from 'react';
 import mermaid from 'mermaid';
-import { ActivitySquareIcon } from 'lucide-react';
 import { ImagePlugin } from '../editor/plugins/ImagePlugin';
+import { MermaidPlugin } from '../editor/plugins/MermaidPlugin';
 // import SubPagePlugin from '../editor/plugins/SubPagePlugin';
 
 // Configuración de Mermaid
@@ -17,65 +17,6 @@ mermaid.initialize({
   startOnLoad: true,
   theme: 'neutral',
   securityLevel: 'loose'
-});
-
-const MermaidViewDiagram = (props: any) => {
-  const { attributes, element, children } = props;
-  const [svg, setSvg] = useState('');
-
-  useEffect(() => {
-    async function renderDiagram() {
-      try {
-        if (element.code) {
-          const { svg } = await mermaid.render('mermaid-view-' + Date.now(), element.code);
-          setSvg(svg);
-        }
-      } catch (error: any) {
-        setSvg(`<div style="color: red; padding: 10px; border: 1px solid red; border-radius: 4px;">
-          Error en el diagrama: ${error.message || 'Sintaxis incorrecta'}
-        </div>`);
-      }
-    }
-    renderDiagram();
-  }, [element.code]);
-
-  return (
-    <div {...attributes} className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden my-4">
-      <div
-        className="bg-white dark:bg-gray-800 p-4 flex justify-center overflow-auto"
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-      {children}
-    </div>
-  );
-};
-
-// Plugin de solo visualización para Mermaid
-export const MermaidViewPlugin = new YooptaPlugin({
-  type: 'MermaidView',
-  elements: {
-    'mermaid-view-diagram': {
-      render: MermaidViewDiagram,
-      asRoot: true,
-      props: {
-        code: '',
-      },
-    }
-  },
-  options: {
-    display: {
-      title: 'Diagrama Mermaid (solo vista)',
-      description: 'Visualiza un diagrama Mermaid',
-      icon: <ActivitySquareIcon size={24} />,
-    },
-  },
-  parsers: {
-    html: {
-      deserialize: {
-        nodeNames: ['MERMAID-VIEW-DIAGRAM'],
-      },
-    },
-  },
 });
 
 interface DocumentViewerProps {
@@ -101,7 +42,7 @@ const DocumentViewer: FC<DocumentViewerProps> = ({ content }) => {
     Lists.BulletedList,
     Lists.NumberedList,
     Lists.TodoList,
-    MermaidViewPlugin,
+    MermaidPlugin,
     ImagePlugin,
     Table,
     // SubPagePlugin
