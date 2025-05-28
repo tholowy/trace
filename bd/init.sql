@@ -419,6 +419,14 @@ CREATE INDEX page_views_page_id ON page_views (page_id);
 -- =============== FUNCIONES PARA BÚSQUEDA Y NAVEGACIÓN ===============
 
 -- Función para búsqueda de texto completo en páginas
+DROP FUNCTION IF EXISTS search_pages(
+  TEXT,
+  UUID,
+  UUID,
+  INTEGER,
+  INTEGER
+);
+
 CREATE OR REPLACE FUNCTION search_pages(
   search_term TEXT,
   project_id_param UUID DEFAULT NULL,
@@ -433,13 +441,12 @@ RETURNS TABLE (
   project_id UUID,
   project_name TEXT,
   updated_at TIMESTAMP WITH TIME ZONE,
-  rank FLOAT,
+  rank REAL,
   path TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
   WITH RECURSIVE page_paths AS (
-    -- Páginas raíz
     SELECT 
       p.id,
       p.title,
@@ -453,7 +460,6 @@ BEGIN
     
     UNION ALL
     
-    -- Páginas hijas
     SELECT 
       p.id,
       p.title,
@@ -474,7 +480,7 @@ BEGIN
     p.updated_at,
     ts_rank(
       to_tsvector('spanish', p.title || ' ' || COALESCE(p.description, '') || ' ' || COALESCE(p.content::text, '')), 
-      to_tsquery('spanish', search_term)
+      to_tsquery('spanish', search_term || ':*')
     ) as rank,
     pp.path
   FROM
@@ -483,12 +489,12 @@ BEGIN
     LEFT JOIN project_members pm ON p.project_id = pm.project_id
     LEFT JOIN page_paths pp ON p.id = pp.id
   WHERE
-    (pr.is_public OR pm.user_id = auth.uid()) AND
+    pm.user_id = auth.uid() AND
     (project_id_param IS NULL OR p.project_id = project_id_param) AND
     (
       search_term IS NULL OR
       to_tsvector('spanish', p.title || ' ' || COALESCE(p.description, '') || ' ' || COALESCE(p.content::text, '')) 
-      @@ to_tsquery('spanish', search_term)
+      @@ to_tsquery('spanish', search_term || ':*')
     )
   ORDER BY
     rank DESC
