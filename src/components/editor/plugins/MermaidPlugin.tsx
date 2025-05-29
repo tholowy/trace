@@ -41,6 +41,7 @@ const MermaidDiagram = (props: any) => {
   const [showSettings, setShowSettings] = useState(false);
   const [blockHeight, setBlockHeight] = useState(initialHeight);
   const [localMermaidData, setLocalMermaidData] = useState<any>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Estados para el modal maximizado
   const [isMaximized, setIsMaximized] = useState(false);
@@ -51,6 +52,39 @@ const MermaidDiagram = (props: any) => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modalDiagramRef = useRef<HTMLDivElement>(null);
+
+  // Detectar modo oscuro
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark') || 
+                     document.body.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+
+    // Verificar inicialmente
+    checkDarkMode();
+
+    // Observar cambios en la clase dark
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          checkDarkMode();
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -227,7 +261,7 @@ const MermaidDiagram = (props: any) => {
       mermaid.initialize({ 
         startOnLoad: false, 
         securityLevel: 'strict',
-        theme: 'default',
+        theme: isDarkMode ? 'dark' : 'default',
         fontFamily: 'Inter, system-ui, sans-serif',
         flowchart: {
           useMaxWidth: true,
@@ -262,12 +296,12 @@ const MermaidDiagram = (props: any) => {
       setSvg('');
       setError(`Error en el diagrama: ${error.message || 'Sintaxis incorrecta'}`);
     }
-  }, [element.id]);
+  }, [element.id, isDarkMode]);
 
-  // Renderizar diagrama cuando cambie el código
+  // Renderizar diagrama cuando cambie el código o el modo oscuro
   useEffect(() => {
     renderDiagram(code);
-  }, [code, renderDiagram]);
+  }, [code, renderDiagram, isDarkMode]);
 
   // Manejar cambios en el código
   const handleCodeChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -634,6 +668,7 @@ const MermaidDiagram = (props: any) => {
               style={{ touchAction: 'none' }}
             >
               <div
+                className='w-3/5 h-3/5'
                 style={{
                   transform: `translate(${modalPanOffset.x}px, ${modalPanOffset.y}px) scale(${modalZoomLevel})`,
                   transformOrigin: 'center center',
