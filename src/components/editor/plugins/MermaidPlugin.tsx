@@ -31,7 +31,7 @@ const MermaidDiagram = (props: any) => {
 
   const {
     code: initialCode = 'graph TD;\nA-->B;\nB-->C;',
-    height: initialHeight = 400
+    height: initialHeight = 600
   } = elementProps;
 
   // Estados locales
@@ -228,12 +228,34 @@ const MermaidDiagram = (props: any) => {
         startOnLoad: false, 
         securityLevel: 'strict',
         theme: 'default',
-        fontFamily: 'Inter, system-ui, sans-serif'
+        fontFamily: 'Inter, system-ui, sans-serif',
+        flowchart: {
+          useMaxWidth: true,
+          htmlLabels: true,
+          padding: 10
+        },
+        sequence: {
+          useMaxWidth: true,
+          boxMargin: 10,
+          boxTextMargin: 5
+        },
+        gantt: {
+          useMaxWidth: true,
+          leftPadding: 75,
+          rightPadding: 20
+        }
       });
       
       const renderId = `mermaid-diagram-${element.id}-${Date.now()}`;
       const { svg } = await mermaid.render(renderId, source);
-      setSvg(svg);
+      
+      // Modificar el SVG para que se ajuste proporcionalmente al contenedor
+      const modifiedSvg = svg.replace(
+        '<svg',
+        '<svg style="max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; margin: 0 auto;"'
+      );
+      
+      setSvg(modifiedSvg);
       setError(null);
     } catch (error: any) {
       console.error('Error rendering Mermaid diagram:', error);
@@ -291,7 +313,7 @@ const MermaidDiagram = (props: any) => {
 
   const openMaximizedView = useCallback(() => {
     setIsMaximized(true);
-    setModalZoomLevel(1);
+    setModalZoomLevel(1.2); // Zoom inicial un poco mayor para pantalla completa
     setModalPanOffset({ x: 0, y: 0 });
   }, []);
 
@@ -311,6 +333,11 @@ const MermaidDiagram = (props: any) => {
   const resetModalZoomAndPan = useCallback(() => {
     setModalZoomLevel(1);
     setModalPanOffset({ x: 0, y: 0 });
+    // Forzar re-render para asegurar que el reset se aplique
+    setTimeout(() => {
+      setModalZoomLevel(1.2); // Zoom por defecto para modal
+      setModalPanOffset({ x: 0, y: 0 });
+    }, 50);
   }, []);
 
   const handleModalMouseDown = useCallback((e: React.MouseEvent) => {
@@ -323,20 +350,30 @@ const MermaidDiagram = (props: any) => {
 
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      if (isMaximized && modalDiagramRef.current?.contains(e.target as Node)) {
-        e.preventDefault();
-        e.stopPropagation();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setModalZoomLevel(prev => Math.max(0.2, Math.min(5, prev + delta)));
+      if (isMaximized && modalDiagramRef.current) {
+        const rect = modalDiagramRef.current.getBoundingClientRect();
+        const isInsideModalDiagram = (
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom
+        );
+
+        if (isInsideModalDiagram) {
+          e.preventDefault();
+          e.stopPropagation();
+          const delta = e.deltaY > 0 ? -0.1 : 0.1;
+          setModalZoomLevel(prev => Math.max(0.2, Math.min(5, prev + delta)));
+        }
       }
     };
 
-    if (isMaximized && modalDiagramRef.current) {
-      const element = modalDiagramRef.current;
-      element.addEventListener('wheel', handleWheel, { passive: false });
+    if (isMaximized) {
+      // Agregar el listener al documento para capturar todos los eventos wheel
+      document.addEventListener('wheel', handleWheel, { passive: false });
       
       return () => {
-        element.removeEventListener('wheel', handleWheel);
+        document.removeEventListener('wheel', handleWheel);
       };
     }
   }, [isMaximized]);
@@ -379,24 +416,55 @@ const MermaidDiagram = (props: any) => {
       try {
         const currentValue = editor.getEditorValue();
         
-        // Buscar el bloque que contiene este elemento
-        const blockId = Object.keys(currentValue).find(id => {
-          const block = currentValue[id];
-          return block.id === element.id || 
-                 (block.value && Array.isArray(block.value) && 
-                  block.value.some((el: any) => el.id === element.id)) ||
-                 (block.type === 'Mermaid');
+        console.log("🔍 Buscando bloque para eliminar elemento:", element.id);
+        console.log("📊 Estructura actual del editor:", currentValue);
+        
+        // Buscar el bloque que contiene exactamente este elemento
+        let targetBlockId = null;
+        
+        Object.keys(currentValue).forEach((blockId) => {
+          const block = currentValue[blockId];
+          
+          // Opción 1: El bloque principal es el elemento
+          if (block.id === element.id) {
+            targetBlockId = blockId;
+            console.log("✅ Encontrado como bloque principal:", blockId);
+            return;
+          }
+          
+          // Opción 2: El elemento está dentro del array value del bloque
+          if (block.value && Array.isArray(block.value)) {
+            const elementInBlock = block.value.find((el: any) => el.id === element.id);
+            if (elementInBlock) {
+              targetBlockId = blockId;
+              console.log("✅ Encontrado dentro del bloque:", blockId, "elemento:", element.id);
+              return;
+            }
+          }
         });
 
-        if (blockId) {
-          console.log("🗑️ Eliminando bloque:", blockId);
-          editor.deleteBlock({ blockId });
+        if (targetBlockId) {
+          console.log("🗑️ Eliminando bloque:", targetBlockId);
+          editor.deleteBlock({ blockId: targetBlockId });
+          
+          // Notificar cambios al contexto
+          setTimeout(() => {
+            const context = (window as any).yooptaContext;
+            if (context?.onEditorChange) {
+              const newValue = editor.getEditorValue();
+              console.log("📡 Notificando eliminación al contexto");
+              context.onEditorChange(newValue);
+            }
+          }, 100);
+          
         } else {
-          console.error("❌ No se encontró el bloque para eliminar");
-          setError("No se pudo encontrar el bloque para eliminar.");
+          console.error("❌ No se encontró el bloque específico para eliminar");
+          console.error("Element ID buscado:", element.id);
+          console.error("Bloques disponibles:", Object.keys(currentValue));
+          setError("No se pudo encontrar el diagrama específico para eliminar.");
         }
       } catch (err) {
-        console.error("Error eliminando bloque de diagrama Mermaid:", err);
+        console.error("❌ Error eliminando bloque de diagrama Mermaid:", err);
         setError("Error al eliminar el diagrama.");
       }
       setShowSettings(false);
@@ -578,7 +646,10 @@ const MermaidDiagram = (props: any) => {
                     <p className="text-center max-w-md">{error}</p>
                   </div>
                 ) : svg ? (
-                  <div dangerouslySetInnerHTML={{ __html: svg }} className="mermaid-diagram-svg" />
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: svg }} 
+                    className="mermaid-diagram-svg flex justify-center items-center h-full w-full"
+                  />
                 ) : (
                   <div className="text-muted-foreground text-xl">Esperando código Mermaid...</div>
                 )}
@@ -614,10 +685,10 @@ const MermaidDiagram = (props: any) => {
             <Maximize className="w-4 h-4" />
           </button>
 
-          <div 
-            className="bg-card p-4 relative overflow-hidden flex items-center justify-center"
-            style={{ minHeight: '200px', height: blockHeight }}
-          >
+        <div 
+          className="bg-card p-4 relative overflow-hidden flex items-center justify-center"
+          style={{ minHeight: '200px', height: blockHeight }}
+        >
             {error ? (
               <div className="flex flex-col items-center justify-center p-4 text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
                 <AlertCircle className="w-6 h-6 mb-2" />
@@ -626,7 +697,7 @@ const MermaidDiagram = (props: any) => {
             ) : svg ? (
               <div 
                 dangerouslySetInnerHTML={{ __html: svg }} 
-                className="mermaid-diagram-svg max-w-full max-h-full"
+                className="mermaid-diagram-svg flex justify-center items-center h-full w-full"
               />
             ) : (
               <div className="text-muted-foreground text-sm">Esperando código Mermaid...</div>
@@ -696,7 +767,7 @@ const MermaidDiagram = (props: any) => {
           </div>
 
           {/* Vista del diagrama */}
-          <div className="bg-card" style={{ height: '60%' }}>
+          <div className="bg-card overflow-hidden" style={{ height: '60%' }}>
             <div 
               className="p-4 relative overflow-hidden flex items-center justify-center h-full"
             >
@@ -708,7 +779,7 @@ const MermaidDiagram = (props: any) => {
               ) : svg ? (
                 <div 
                   dangerouslySetInnerHTML={{ __html: svg }} 
-                  className="mermaid-diagram-svg max-w-full max-h-full"
+                  className="mermaid-diagram-svg flex justify-center items-center h-full w-full"
                 />
               ) : (
                 <div className="text-muted-foreground text-sm">Esperando código Mermaid...</div>
@@ -735,7 +806,7 @@ const BaseMermaidPlugin = new YooptaPlugin({
       props: {
         nodeType: 'void',
         code: 'graph TD;\nA-->B;\nB-->C;',
-        height: 400,
+        height: 600,
       },
     }
   },
@@ -768,7 +839,7 @@ const BaseMermaidPlugin = new YooptaPlugin({
       serialize: (element: any) => {
         const { code, height } = element.props || {};
         if (!code) return '';
-        return `<mermaid-diagram code="${encodeURIComponent(code)}" height="${height || 400}"></mermaid-diagram>`;
+        return `<mermaid-diagram code="${encodeURIComponent(code)}" height="${height || 600}"></mermaid-diagram>`;
       },
     },
   },
