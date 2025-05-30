@@ -159,7 +159,7 @@ const ProjectForm: FC<ProjectFormProps> = ({
       if (submissionError) throw submissionError;
 
       if (!isEditing && data && user) {
-        await projectService.addProjectMember(data.id, user.id, 'admin');
+        await projectService.addProjectMember(data.id, user.id, 1);
       }
 
       if (data) onSuccess(data.id);

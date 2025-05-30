@@ -1,28 +1,80 @@
-import { supabase } from '../lib/supabase';
-import type { Project, ProjectMember, Category, ServiceResponse, Role } from '../types';
+import { supabase } from "../lib/supabase";
+import type {
+  Project,
+  ProjectMember,
+  Category,
+  ServiceResponse,
+} from "../types";
 
+export type Role = {
+  id: number;
+  name: string;
+};
 
 export const projectService = {
   async getProjects(): Promise<ServiceResponse<Project[]>> {
     try {
       const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('updated_at', { ascending: false });
+        .from("projects")
+        .select("*")
+        .order("updated_at", { ascending: false });
 
       if (error) throw error;
       return { data, error: null };
-    } catch (error: any) { // Explicitly type error as any
-      return { data: null, error: error.message }; // Return error message
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
+  },
+
+  async getProjectPermissions(): Promise<
+    ServiceResponse<{ id: number; name: string; description?: string }[]>
+  > {
+    try {
+      const { data, error } = await supabase
+        .from("project_permissions")
+        .select("id, name, description")
+        .order("id", { ascending: true });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  },
+
+  // NUEVA FUNCIÓN: Usar la función RPC específica para invitar/agregar miembros
+  async inviteOrAddMember(
+    projectId: string, 
+    email: string, 
+    permissionId: number
+  ): Promise<ServiceResponse<string>> {
+    try {
+      const { data, error } = await supabase.rpc("invite_or_add_project_member", {
+        project_id_param: projectId,
+        email_param: email,
+        project_permission_id_param: permissionId,
+      });
+
+      if (error) throw error;
+      
+      return { data: data || "Miembro procesado exitosamente", error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  },
+
+  // FUNCIÓN OBSOLETA - mantener por compatibilidad pero recomendar usar inviteOrAddMember
+  async agregarMiembro(projectId: string, email: string, permissionId: number) {
+    console.warn("agregarMiembro está obsoleto, usa inviteOrAddMember");
+    return this.inviteOrAddMember(projectId, email, permissionId);
   },
 
   async getProjectById(id: string): Promise<ServiceResponse<Project>> {
     try {
       const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
+        .from("projects")
+        .select("*")
+        .eq("id", id)
         .single();
 
       if (error) throw error;
@@ -32,10 +84,12 @@ export const projectService = {
     }
   },
 
-  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ServiceResponse<Project>> {
+  async createProject(
+    project: Omit<Project, "id" | "created_at" | "updated_at">
+  ): Promise<ServiceResponse<Project>> {
     try {
       const { data, error } = await supabase
-        .from('projects')
+        .from("projects")
         .insert(project)
         .select()
         .single();
@@ -47,12 +101,15 @@ export const projectService = {
     }
   },
 
-  async updateProject(id: string, project: Partial<Project>): Promise<ServiceResponse<Project>> {
+  async updateProject(
+    id: string,
+    project: Partial<Project>
+  ): Promise<ServiceResponse<Project>> {
     try {
       const { data, error } = await supabase
-        .from('projects')
+        .from("projects")
         .update(project)
-        .eq('id', id)
+        .eq("id", id)
         .select()
         .single();
 
@@ -65,10 +122,7 @@ export const projectService = {
 
   async deleteProject(id: string): Promise<ServiceResponse<null>> {
     try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from("projects").delete().eq("id", id);
 
       if (error) throw error;
       return { data: null, error: null };
@@ -77,147 +131,199 @@ export const projectService = {
     }
   },
 
-  async getProjectMembers(projectId: string): Promise<ServiceResponse<ProjectMember[]>> {
+  // FUNCIÓN ACTUALIZADA: Usar la vista project_members_detailed
+  async getProjectMembers(
+    projectId: string
+  ): Promise<ServiceResponse<ProjectMember[]>> {
     try {
-      // 1. Obtener los miembros del proyecto
       const { data: members, error } = await supabase
-        .from('project_members')
-        .select('*')
-        .eq('project_id', projectId);
+        .from("project_members_detailed")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
 
-      if (!members || members.length === 0) {
-        return { data: [], error: null };
-      }
-
-      // 2. Obtener información de los usuarios
-      const userIds = members.map(member => member.user_id);
-
-      // Obtener perfiles de usuario
-      const { data: profiles, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .in('id', userIds);
-
-      if (profilesError) throw profilesError;
-
-      // 3. Combinar la información
-      const enrichedMembers = members.map(member => {
-        const profile = profiles?.find(p => p.id === member.user_id);
-
-        return {
-          ...member,
-          user: {
+      // Transformar los datos para que coincidan con el tipo ProjectMember esperado
+      const transformedMembers: ProjectMember[] = (members || []).map((member) => ({
+        id: member.id,
+        project_id: member.project_id,
+        user_id: member.user_id,
+        project_permission_id: member.project_permission_id,
+        created_at: member.created_at,
+        permission_name: member.permission_name,
+        permission_description: member.permission_description,
+        is_owner: member.is_owner,
+        user: {
+          id: member.user_id,
+          email: member.email,
+          profile: {
             id: member.user_id,
-            profile: profile || null
-          }
-        };
-      });
+            first_name: member.first_name,
+            last_name: member.last_name,
+            avatar_url: member.avatar_url,
+            job_title: member.job_title,
+            company: member.company,
+            created_at: "", // La vista no incluye estas fechas
+            updated_at: "",
+          },
+        },
+      }));
 
-      return { data: enrichedMembers, error: null };
-    } catch (error) {
-      return { data: null, error };
+      return { data: transformedMembers, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
     }
   },
 
+  // FUNCIÓN OBSOLETA - mantener por compatibilidad pero usar inviteOrAddMember
   async addProjectMember(
     projectId: string,
     userId: string,
-    permissionLevel: 'viewer' | 'editor' | 'admin' = 'viewer'
-  ): Promise<{ data: ProjectMember | null; error: string | null }> {
+    projectPermissionId: number
+  ): Promise<ServiceResponse<ProjectMember>> {
+    console.warn("addProjectMember está obsoleto, usa inviteOrAddMember con email");
     try {
       const { data: member, error: memberError } = await supabase
-        .from('project_members')
+        .from("project_members")
         .insert({
           project_id: projectId,
           user_id: userId,
-          permission_level: permissionLevel
+          project_permission_id: projectPermissionId,
         })
-        .select('*')
+        .select("*")
         .single();
-  
+
       if (memberError) throw memberError;
-  
+
       const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('id, first_name, last_name, avatar_url')
-        .eq('id', userId)
+        .from("user_profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
-  
-      if (profileError) throw profileError;
-  
+
+      if (profileError) {
+        // Si no hay perfil, crear uno básico
+        console.warn("Perfil no encontrado para usuario:", userId);
+      }
+
       const newMember: ProjectMember = {
         ...member,
         user: {
           id: userId,
-          profile
-        }
+          profile: profile || {
+            id: userId,
+            first_name: "",
+            last_name: "",
+            avatar_url: "",
+            job_title: "",
+            company: "",
+            created_at: "",
+            updated_at: "",
+          },
+        },
       };
-  
+
       return { data: newMember, error: null };
     } catch (error: any) {
       return { data: null, error: error.message };
     }
   },
 
+  // FUNCIÓN ACTUALIZADA: Usar la función RPC específica
   async updateProjectMember(
     projectId: string,
     userId: string,
-    permissionLevel: ProjectMember['permission_level']
-  ): Promise<ServiceResponse<ProjectMember>> {
+    newPermissionId: number
+  ): Promise<ServiceResponse<string>> {
     try {
-      const { data, error } = await supabase
-        .from('project_members')
-        .update({ permission_level: permissionLevel }) // Corrected column name to 'permission_level'
-        .eq('project_id', projectId)
-        .eq('user_id', userId)
-        .select(`
-          *,
-          user_profiles (
-            id,
-            first_name,
-            last_name,
-            avatar_url,
-            email
-          )
-        `) // Select to get the updated member data with user profile
-        .single();
+      const { data, error } = await supabase.rpc("update_member_permission", {
+        project_id_param: projectId,
+        user_id_param: userId,
+        new_permission_id_param: newPermissionId,
+      });
 
       if (error) throw error;
-
-      // Structure the returned data to match ProjectMember
-      const updatedMember: ProjectMember = {
-        ...data,
-        user: {
-          id: data.user_profiles.id,
-          email: data.user_profiles.email,
-          profile: {
-            id: data.user_profiles.id,
-            first_name: data.user_profiles.first_name,
-            last_name: data.user_profiles.last_name,
-            avatar_url: data.user_profiles.avatar_url,
-            created_at: '', // Placeholder
-            updated_at: ''  // Placeholder
-          },
-        },
-      };
-      return { data: updatedMember, error: null };
+      
+      return { data: data || "Permiso actualizado exitosamente", error: null };
     } catch (error: any) {
       return { data: null, error: error.message };
     }
   },
 
-  async removeProjectMember(projectId: string, userId: string): Promise<ServiceResponse<null>> {
+  // FUNCIÓN ACTUALIZADA: Usar la función RPC específica
+  async removeProjectMember(
+    projectId: string,
+    userId: string
+  ): Promise<ServiceResponse<string>> {
     try {
-      const { error } = await supabase
-        .from('project_members')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('user_id', userId);
+      const { data, error } = await supabase.rpc("remove_project_member", {
+        project_id_param: projectId,
+        user_id_param: userId,
+      });
 
       if (error) throw error;
-      return { data: null, error: null };
+      
+      return { data: data || "Miembro eliminado exitosamente", error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  },
+
+  // NUEVA FUNCIÓN: Obtener permisos del usuario actual en un proyecto
+  async getUserProjectPermission(
+    projectId: string
+  ): Promise<ServiceResponse<{
+    permission_id: number;
+    permission_name: string;
+    is_owner: boolean;
+  }>> {
+    try {
+      const { data, error } = await supabase.rpc("get_user_project_permission", {
+        project_id_param: projectId,
+      });
+
+      if (error) throw error;
+      
+      return { data: data?.[0] || null, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  },
+
+  // NUEVA FUNCIÓN: Diagnosticar problemas de usuario
+  async diagnoseUserIssues(
+    userId: string
+  ): Promise<ServiceResponse<Array<{
+    check_name: string;
+    status: string;
+    details: string;
+  }>>> {
+    try {
+      const { data, error } = await supabase.rpc("diagnose_user_issues", {
+        user_id_param: userId,
+      });
+
+      if (error) throw error;
+      
+      return { data: data || [], error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  },
+
+  // NUEVA FUNCIÓN: Limpiar invitaciones expiradas
+  async cleanupExpiredInvitations(): Promise<ServiceResponse<{
+    deleted_count: number;
+    oldest_expired: string;
+    details: string;
+  }>> {
+    try {
+      const { data, error } = await supabase.rpc("cleanup_expired_invitations");
+
+      if (error) throw error;
+      
+      return { data: data?.[0] || null, error: null };
     } catch (error: any) {
       return { data: null, error: error.message };
     }
@@ -226,9 +332,9 @@ export const projectService = {
   async getRoles(): Promise<ServiceResponse<Role[]>> {
     try {
       const { data, error } = await supabase
-        .from('roles')
-        .select('*')
-        .order('name', { ascending: true }); // Order alphabetically
+        .from("roles")
+        .select("*")
+        .order("name", { ascending: true });
 
       if (error) throw error;
       return { data, error: null };
@@ -237,13 +343,16 @@ export const projectService = {
     }
   },
 
+  // NOTA: Las funciones de categorías siguen igual pero deberían actualizarse para usar "pages"
+  // según el nuevo esquema de base de datos
   async getCategories(projectId: string): Promise<ServiceResponse<Category[]>> {
+    console.warn("getCategories debería migrar a usar 'pages' según el nuevo esquema");
     try {
       const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('order_index', { ascending: true });
+        .from("categories")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("order_index", { ascending: true });
 
       if (error) throw error;
       return { data, error: null };
@@ -252,10 +361,13 @@ export const projectService = {
     }
   },
 
-  async createCategory(category: Omit<Category, 'id' | 'created_at' | 'updated_at'>): Promise<ServiceResponse<Category>> {
+  async createCategory(
+    category: Omit<Category, "id" | "created_at" | "updated_at">
+  ): Promise<ServiceResponse<Category>> {
+    console.warn("createCategory debería migrar a usar 'pages' según el nuevo esquema");
     try {
       const { data, error } = await supabase
-        .from('categories')
+        .from("categories")
         .insert(category)
         .select()
         .single();
@@ -267,12 +379,16 @@ export const projectService = {
     }
   },
 
-  async updateCategory(id: string, category: Partial<Category>): Promise<ServiceResponse<Category>> {
+  async updateCategory(
+    id: string,
+    category: Partial<Category>
+  ): Promise<ServiceResponse<Category>> {
+    console.warn("updateCategory debería migrar a usar 'pages' según el nuevo esquema");
     try {
       const { data, error } = await supabase
-        .from('categories')
+        .from("categories")
         .update(category)
-        .eq('id', id)
+        .eq("id", id)
         .select()
         .single();
 
@@ -284,16 +400,14 @@ export const projectService = {
   },
 
   async deleteCategory(id: string): Promise<ServiceResponse<null>> {
+    console.warn("deleteCategory debería migrar a usar 'pages' según el nuevo esquema");
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from("categories").delete().eq("id", id);
 
       if (error) throw error;
       return { data: null, error: null };
     } catch (error: any) {
       return { data: null, error: error.message };
     }
-  }
+  },
 };

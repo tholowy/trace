@@ -53,8 +53,10 @@ export interface ProjectMember {
   id: string;
   project_id: string;
   user_id: string;
-  permission_level: 'viewer' | 'editor' | 'admin';
+  project_permission_id: number,
   created_at: string;
+  is_owner: boolean,
+  permission_name: string,
   user?: {
     id: string;
     email: string;
